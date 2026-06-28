@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NY &amp; VT Real Estate Listings</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #1a1a1a; background: #fff; }
+    main, .table-wrap, table { background: #fff; }
+    tbody td { background: #fff; }
+    header { background: #1f3a5f; color: #fff; padding: 12px 20px; display: flex; align-items: baseline; gap: 16px; }
+    header h1 { font-size: 18px; margin: 0; font-weight: 600; }
+    header .meta { font-size: 13px; opacity: 0.8; }
+    .layout { display: flex; height: calc(100vh - 49px); }
+    aside { width: 280px; flex-shrink: 0; background: #f5f6f8; border-right: 1px solid #dcdfe4; padding: 16px; overflow-y: auto; }
+    main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+    #map { height: 45%; min-height: 240px; }
+    .table-wrap { flex: 1; overflow: auto; }
+
+    .field { margin-bottom: 14px; }
+    .field label { display: block; font-size: 12px; font-weight: 600; color: #444; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.03em; }
+    .field input, .field select { width: 100%; padding: 6px 8px; border: 1px solid #c4c8cf; border-radius: 4px; font-size: 14px; }
+    .row2 { display: flex; gap: 8px; }
+    .row2 > * { flex: 1; }
+    .checks label { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 400; text-transform: none; letter-spacing: 0; margin-bottom: 4px; cursor: pointer; }
+    .checks .note { font-size: 11px; color: #9a6a00; margin-left: 22px; }
+    .btns { display: flex; gap: 8px; margin-top: 8px; }
+    button { padding: 8px 12px; border: none; border-radius: 4px; font-size: 14px; cursor: pointer; }
+    .btn-primary { background: #1f3a5f; color: #fff; flex: 1; }
+    .btn-secondary { background: #e3e6ea; color: #1a1a1a; }
+    .btn-export { background: #137333; color: #fff; width: 100%; margin-top: 14px; display: block; text-align: center; text-decoration: none; box-sizing: border-box; padding: 9px 12px; border-radius: 4px; font-size: 14px; }
+    .count { font-size: 13px; color: #555; margin: 6px 0 14px; }
+
+    table { border-collapse: collapse; width: 100%; font-size: 13px; }
+    th, td { padding: 6px 10px; text-align: left; border-bottom: 1px solid #ececec; white-space: nowrap; }
+    th { position: sticky; top: 0; background: #eef1f5; cursor: pointer; user-select: none; font-weight: 600; }
+    th:hover { background: #e2e7ee; }
+    th .arrow { font-size: 10px; color: #888; }
+    tbody tr:hover td { background: #f5f9ff; }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .empty { padding: 30px; text-align: center; color: #888; }
+    .badge { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 11px; background: #e8eef6; color: #1f3a5f; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>NY &amp; VT Real Estate Listings</h1>
+    <span class="meta" id="header-meta"></span>
+  </header>
+
+  <div class="layout">
+    <aside>
+      <div class="field">
+        <label>Price ($)</label>
+        <div class="row2">
+          <input type="number" id="price_min" placeholder="Min">
+          <input type="number" id="price_max" placeholder="Max">
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="zip">ZIP code</label>
+        <select id="zip"><option value="">All ZIPs</option></select>
+      </div>
+
+      <div class="field">
+        <label>Minimum beds / baths</label>
+        <div class="row2">
+          <input type="number" id="beds_min" placeholder="Beds" min="0">
+          <input type="number" id="baths_min" placeholder="Baths" min="0">
+        </div>
+      </div>
+
+      <div class="field checks">
+        <label style="text-transform:uppercase;font-size:12px;color:#444;font-weight:600;cursor:default;">Property type</label>
+        <div id="categories"></div>
+      </div>
+
+      <div class="btns">
+        <button class="btn-primary" id="apply">Apply filters</button>
+        <button class="btn-secondary" id="reset">Reset</button>
+      </div>
+
+      <p class="count" id="count"></p>
+      <a class="btn-export" id="export" href="#">⬇ Export to Excel</a>
+    </aside>
+
+    <main>
+      <div id="map"></div>
+      <div class="table-wrap">
+        <table id="table">
+          <thead><tr id="thead-row"></tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+        <div class="empty" id="empty" style="display:none;">No listings match these filters.</div>
+      </div>
+    </main>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <script>
+    const BOOTSTRAP = {{ bootstrap | tojson }};
+
+    const COLUMNS = [
+      { key: 'address',       label: 'Address',  num: false },
+      { key: 'city',          label: 'City',     num: false },
+      { key: 'zip',           label: 'ZIP',      num: false },
+      { key: 'price',         label: 'Price',    num: true,  fmt: v => v == null ? '' : '$' + v.toLocaleString() },
+      { key: 'bedrooms',      label: 'Beds',     num: true },
+      { key: 'bathrooms',     label: 'Baths',    num: true },
+      { key: 'squareFootage', label: 'Sq Ft',    num: true,  fmt: v => v == null ? '' : v.toLocaleString() },
+      { key: 'propertyType',  label: 'Type',     num: false },
+      { key: 'category',      label: 'Category', num: false, fmt: v => `<span class="badge">${v ?? ''}</span>` },
+      { key: 'daysOnMarket',  label: 'DOM',      num: true },
+    ];
+
+    let listings = [];
+    let sortKey = 'price';
+    let sortAsc = false;
+
+    // --- Map setup ---
+    const map = L.map('map').setView([43.5, -74.5], 6); // NY/VT region
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors', maxZoom: 19,
+    }).addTo(map);
+    const cluster = L.markerClusterGroup();
+    map.addLayer(cluster);
+
+    // --- Filter controls ---
+    function buildCategoryChecks() {
+      const wrap = document.getElementById('categories');
+      BOOTSTRAP.categories.forEach(cat => {
+        const id = 'cat_' + cat;
+        const label = document.createElement('label');
+        label.innerHTML = `<input type="checkbox" id="${id}" value="${cat}" checked> ${cat.charAt(0).toUpperCase() + cat.slice(1)}`;
+        wrap.appendChild(label);
+        if (cat === 'commercial') {
+          const note = document.createElement('div');
+          note.className = 'note';
+          note.textContent = 'No data from current source';
+          wrap.appendChild(note);
+        }
+      });
+    }
+
+    function buildZipOptions() {
+      const sel = document.getElementById('zip');
+      BOOTSTRAP.zips.forEach(z => {
+        const opt = document.createElement('option');
+        opt.value = z; opt.textContent = z;
+        sel.appendChild(opt);
+      });
+    }
+
+    function selectedCategories() {
+      return BOOTSTRAP.categories.filter(c => {
+        const el = document.getElementById('cat_' + c);
+        return el && el.checked;
+      });
+    }
+
+    function currentQuery() {
+      const p = new URLSearchParams();
+      const pmin = document.getElementById('price_min').value;
+      const pmax = document.getElementById('price_max').value;
+      const zip = document.getElementById('zip').value;
+      const beds = document.getElementById('beds_min').value;
+      const baths = document.getElementById('baths_min').value;
+      if (pmin) p.set('price_min', pmin);
+      if (pmax) p.set('price_max', pmax);
+      if (zip) p.set('zip', zip);
+      if (beds) p.set('beds_min', beds);
+      if (baths) p.set('baths_min', baths);
+      const cats = selectedCategories();
+      if (cats.length < BOOTSTRAP.categories.length) p.set('categories', cats.join(','));
+      return p;
+    }
+
+    async function applyFilters() {
+      const qs = currentQuery().toString();
+      const res = await fetch('/api/listings?' + qs);
+      const data = await res.json();
+      listings = data.listings;
+      document.getElementById('count').textContent =
+        data.count.toLocaleString() + ' of ' + BOOTSTRAP.count.toLocaleString() + ' listings';
+      document.getElementById('export').href = '/api/export.xlsx?' + qs;
+      renderTable();
+      renderMap();
+    }
+
+    function resetFilters() {
+      document.getElementById('price_min').value = '';
+      document.getElementById('price_max').value = '';
+      document.getElementById('zip').value = '';
+      document.getElementById('beds_min').value = '';
+      document.getElementById('baths_min').value = '';
+      BOOTSTRAP.categories.forEach(c => {
+        const el = document.getElementById('cat_' + c);
+        if (el) el.checked = true;
+      });
+      applyFilters();
+    }
+
+    // --- Table ---
+    function renderHead() {
+      const tr = document.getElementById('thead-row');
+      tr.innerHTML = '';
+      COLUMNS.forEach(col => {
+        const th = document.createElement('th');
+        const arrow = sortKey === col.key ? (sortAsc ? ' ▲' : ' ▼') : '';
+        th.innerHTML = col.label + `<span class="arrow">${arrow}</span>`;
+        th.onclick = () => {
+          if (sortKey === col.key) sortAsc = !sortAsc;
+          else { sortKey = col.key; sortAsc = col.num ? true : true; }
+          renderTable();
+        };
+        tr.appendChild(th);
+      });
+    }
+
+    function renderTable() {
+      renderHead();
+      const sorted = [...listings].sort((a, b) => {
+        const av = a[sortKey], bv = b[sortKey];
+        if (av == null && bv == null) return 0;
+        if (av == null) return 1;
+        if (bv == null) return -1;
+        if (av < bv) return sortAsc ? -1 : 1;
+        if (av > bv) return sortAsc ? 1 : -1;
+        return 0;
+      });
+      const tbody = document.getElementById('tbody');
+      tbody.innerHTML = '';
+      document.getElementById('empty').style.display = sorted.length ? 'none' : 'block';
+      const frag = document.createDocumentFragment();
+      sorted.forEach(L => {
+        const tr = document.createElement('tr');
+        COLUMNS.forEach(col => {
+          const td = document.createElement('td');
+          if (col.num) td.className = 'num';
+          const raw = L[col.key];
+          let html = col.fmt ? col.fmt(raw) : (raw ?? '');
+          if (col.key === 'address' && L.url) {
+            html = `<a href="${L.url}" target="_blank" rel="noopener">${raw ?? ''}</a>`;
+          }
+          td.innerHTML = html;
+          tr.appendChild(td);
+        });
+        frag.appendChild(tr);
+      });
+      tbody.appendChild(frag);
+    }
+
+    // --- Map markers ---
+    function renderMap() {
+      cluster.clearLayers();
+      const markers = [];
+      listings.forEach(L => {
+        if (L.lat == null || L.lng == null) return;
+        const price = L.price == null ? 'N/A' : '$' + L.price.toLocaleString();
+        const m = window.L.marker([L.lat, L.lng]);
+        m.bindPopup(
+          `<strong>${price}</strong><br>${L.address ?? ''}<br>` +
+          `${L.bedrooms ?? '?'} bd / ${L.bathrooms ?? '?'} ba · ${L.propertyType ?? ''}` +
+          (L.url ? `<br><a href="${L.url}" target="_blank" rel="noopener">View</a>` : '')
+        );
+        markers.push(m);
+      });
+      cluster.addLayers(markers);
+      // Defer to the next frame so the flex container has its final size before
+      // Leaflet measures it — otherwise fitBounds zooms out to a 0-width view.
+      requestAnimationFrame(() => {
+        map.invalidateSize();
+        if (markers.length) map.fitBounds(cluster.getBounds().pad(0.2));
+      });
+    }
+
+    // --- Init ---
+    document.getElementById('header-meta').textContent =
+      `${BOOTSTRAP.count.toLocaleString()} listings` +
+      (BOOTSTRAP.states.length ? ` · ${BOOTSTRAP.states.join(', ')}` : '') +
+      (BOOTSTRAP.fetched_at ? ` · fetched ${BOOTSTRAP.fetched_at.slice(0,10)}` : '');
+    buildCategoryChecks();
+    buildZipOptions();
+    document.getElementById('apply').onclick = applyFilters;
+    document.getElementById('reset').onclick = resetFilters;
+    window.addEventListener('resize', () => map.invalidateSize());
+    applyFilters();
+  </script>
+</body>
+</html>
