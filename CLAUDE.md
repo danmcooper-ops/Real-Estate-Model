@@ -47,21 +47,21 @@ GitHub Pages serves the static site from **main /docs**. Live:
 https://danmcooper-ops.github.io/Real-Estate-Model/
 Refresh = re-run fetch + build_static_site, then commit & push `docs/`.
 
-## Scheduled refresh (macOS launchd)
+## Scheduled refresh (Claude scheduled task)
 
-A launchd agent re-runs fetch + build + push automatically, **Mondays and Fridays
-at 5:00pm Eastern** (local time, DST-safe), republishing the Pages site.
+A Claude scheduled task (`real-estate-refresh`) re-runs fetch + build + push
+automatically, **Mondays and Fridays at 5:00pm Eastern** (cron `0 17 * * 1,5`,
+local time), republishing the Pages site. It appears in the app's **Scheduled**
+section. It runs while the Claude app is open; if the app is closed at the
+scheduled time, it runs on next launch.
 
-- Agent: `~/Library/LaunchAgents/com.realestatemodel.refresh.plist`
-- Script: `~/Library/Application Support/RealEstateModel/refresh.sh`
-- Log: `~/Library/Logs/RealEstateModel/refresh.log`
+- Task definition: `~/.claude/scheduled-tasks/real-estate-refresh/SKILL.md`
+- The task fetches `--states VT`; edit its prompt to use `NY VT` to add New York.
+- The repo lives at `~/Real-Estate-Model` (the task uses that path).
 
-**The repo must live at `~/Real-Estate-Model`, NOT `~/Desktop`** — launchd-spawned
-git/python can't access the TCC-protected Desktop folder ("Operation not
-permitted"). The script fetches `--states VT`; change it to `NY VT` to add NY.
-
-Test now: `launchctl kickstart -p gui/$(id -u)/com.realestatemodel.refresh` (watch the log).
-Disable: `launchctl bootout gui/$(id -u)/com.realestatemodel.refresh`.
+(A local macOS launchd agent was used earlier but removed in favor of this, to
+avoid double-publishing. launchd-spawned git/python can't access a repo under the
+TCC-protected `~/Desktop`, which is why the repo lives in the home directory.)
 
 ## API Keys
 
