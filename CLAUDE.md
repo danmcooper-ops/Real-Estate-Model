@@ -47,6 +47,22 @@ GitHub Pages serves the static site from **main /docs**. Live:
 https://danmcooper-ops.github.io/Real-Estate-Model/
 Refresh = re-run fetch + build_static_site, then commit & push `docs/`.
 
+## Scheduled refresh (macOS launchd)
+
+A launchd agent re-runs fetch + build + push automatically, **Mondays and Fridays
+at 5:00pm Eastern** (local time, DST-safe), republishing the Pages site.
+
+- Agent: `~/Library/LaunchAgents/com.realestatemodel.refresh.plist`
+- Script: `~/Library/Application Support/RealEstateModel/refresh.sh`
+- Log: `~/Library/Logs/RealEstateModel/refresh.log`
+
+**The repo must live at `~/Real-Estate-Model`, NOT `~/Desktop`** — launchd-spawned
+git/python can't access the TCC-protected Desktop folder ("Operation not
+permitted"). The script fetches `--states VT`; change it to `NY VT` to add NY.
+
+Test now: `launchctl kickstart -p gui/$(id -u)/com.realestatemodel.refresh` (watch the log).
+Disable: `launchctl bootout gui/$(id -u)/com.realestatemodel.refresh`.
+
 ## API Keys
 
 - `RENTCAST_API_KEY` required for fetching (set in `.env`, git-ignored). Not needed
