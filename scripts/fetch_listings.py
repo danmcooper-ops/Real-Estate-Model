@@ -71,16 +71,26 @@ def normalize_listing(rec):
     """
     address = rec.get('formattedAddress') or rec.get('addressLine1') or ''
     ptype = rec.get('propertyType')
+
+    def _contact(d):
+        if not d:
+            return None
+        n, p, e = d.get('name'), d.get('phone'), d.get('email')
+        return {'name': n, 'phone': p, 'email': e} if (n or p or e) else None
+
     return {
         'id':            rec.get('id'),
         'address':       address,
         'city':          rec.get('city'),
         'state':         rec.get('state'),
         'zip':           rec.get('zipCode'),
+        'county':        rec.get('county'),
         'lat':           rec.get('latitude'),
         'lng':           rec.get('longitude'),
         'propertyType':  ptype,
         'category':      categorize(ptype),
+        'status':        rec.get('status'),
+        'listingType':   rec.get('listingType'),
         'price':         rec.get('price'),
         'bedrooms':      rec.get('bedrooms'),
         'bathrooms':     rec.get('bathrooms'),
@@ -89,6 +99,12 @@ def normalize_listing(rec):
         'yearBuilt':     rec.get('yearBuilt'),
         'daysOnMarket':  rec.get('daysOnMarket'),
         'listedDate':    rec.get('listedDate'),
+        'lastSeenDate':  rec.get('lastSeenDate'),
+        'mlsName':       rec.get('mlsName'),
+        'mlsNumber':     rec.get('mlsNumber'),
+        'listingAgent':  _contact(rec.get('listingAgent')),
+        'listingOffice': _contact(rec.get('listingOffice')),
+        'history':       rec.get('history'),
         'url':           'https://www.google.com/search?q=' + quote_plus(address + ' for sale') if address else '',
     }
 

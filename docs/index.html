@@ -3,103 +3,315 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>NY &amp; VT Real Estate Listings</title>
+  <title>VT Real Estate Listings</title>
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
+
   <style>
-    * { box-sizing: border-box; }
-    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #1a1a1a; background: #fff; }
-    main, .table-wrap, table { background: #fff; }
-    tbody td { background: #fff; }
-    header { background: #1f3a5f; color: #fff; padding: 12px 20px; display: flex; align-items: baseline; gap: 16px; }
-    header h1 { font-size: 18px; margin: 0; font-weight: 600; }
-    header .meta { font-size: 13px; opacity: 0.8; }
-    .layout { display: flex; height: calc(100vh - 49px); }
-    aside { width: 280px; flex-shrink: 0; background: #f5f6f8; border-right: 1px solid #dcdfe4; padding: 16px; overflow-y: auto; }
-    main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-    #map { height: 45%; min-height: 240px; }
+    /* ── Reset & base ─────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #1a1a1a; background: #f0f2f5; overflow: hidden; }
+
+    /* ── Header ───────────────────────────────────────────── */
+    header { background: #1b3557; color: #fff; padding: 0 20px; height: 50px; display: flex; align-items: center; gap: 14px; flex-shrink: 0; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
+    header h1 { font-size: 17px; font-weight: 700; margin: 0; letter-spacing: -.3px; }
+    header .meta { font-size: 12px; opacity: .7; margin-left: auto; }
+
+    /* ── App shell ────────────────────────────────────────── */
+    .shell { display: flex; height: calc(100vh - 50px); }
+
+    /* ── Sidebar ──────────────────────────────────────────── */
+    aside {
+      width: 260px; flex-shrink: 0;
+      background: #fff; border-right: 1px solid #dde1e8;
+      padding: 14px 14px 20px; overflow-y: auto;
+      display: flex; flex-direction: column; gap: 0;
+    }
+    .fs-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: #8892a4; margin: 14px 0 6px; }
+    .fs-title:first-child { margin-top: 0; }
+    .field { margin-bottom: 8px; }
+    .field label { display: block; font-size: 11px; font-weight: 600; color: #5a6175; margin-bottom: 3px; }
+    .field input, .field select {
+      width: 100%; padding: 6px 8px; border: 1px solid #d0d5df;
+      border-radius: 6px; font-size: 13px; color: #1a1a1a;
+      background: #f8f9fb; transition: border-color .12s, box-shadow .12s;
+      appearance: auto;
+    }
+    .field input:focus, .field select:focus { outline: none; border-color: #1b3557; box-shadow: 0 0 0 3px rgba(27,53,87,.12); background: #fff; }
+    .row2 { display: flex; gap: 6px; }
+    .row2 > * { flex: 1; min-width: 0; }
+    .checks { display: flex; flex-direction: column; gap: 2px; }
+    .checks label { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 400; color: #1a1a1a; padding: 3px 0; cursor: pointer; text-transform: none; letter-spacing: 0; }
+    .checks input[type=checkbox] { width: 14px; height: 14px; accent-color: #1b3557; cursor: pointer; }
+    .note { font-size: 11px; color: #8a6200; margin: 0 0 3px 21px; }
+    .btns { display: flex; gap: 7px; margin-top: 12px; }
+    button { padding: 7px 12px; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; font-weight: 500; }
+    .btn-primary { background: #1b3557; color: #fff; flex: 1; }
+    .btn-primary:hover { background: #14294a; }
+    .btn-reset { background: #e8ebf0; color: #333; }
+    .btn-reset:hover { background: #dde1e8; }
+    .btn-export { background: #137333; color: #fff; width: 100%; margin-top: 12px; }
+    .btn-export:hover { background: #0f5c28; }
+    .count { font-size: 12px; color: #666; margin: 10px 0 0; font-weight: 500; }
+
+    /* ── Main ─────────────────────────────────────────────── */
+    main { flex: 1; display: flex; flex-direction: column; min-width: 0; background: #fff; }
+    #map { height: 42%; min-height: 200px; }
     .table-wrap { flex: 1; overflow: auto; }
 
-    .field { margin-bottom: 14px; }
-    .field label { display: block; font-size: 12px; font-weight: 600; color: #444; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.03em; }
-    .field input, .field select { width: 100%; padding: 6px 8px; border: 1px solid #c4c8cf; border-radius: 4px; font-size: 14px; }
-    .row2 { display: flex; gap: 8px; }
-    .row2 > * { flex: 1; }
-    .checks label { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 400; text-transform: none; letter-spacing: 0; margin-bottom: 4px; cursor: pointer; }
-    .checks .note { font-size: 11px; color: #9a6a00; margin-left: 22px; }
-    .btns { display: flex; gap: 8px; margin-top: 8px; }
-    button { padding: 8px 12px; border: none; border-radius: 4px; font-size: 14px; cursor: pointer; }
-    .btn-primary { background: #1f3a5f; color: #fff; flex: 1; }
-    .btn-secondary { background: #e3e6ea; color: #1a1a1a; }
-    .btn-export { background: #137333; color: #fff; width: 100%; margin-top: 14px; padding: 9px 12px; border-radius: 4px; font-size: 14px; }
-    .count { font-size: 13px; color: #555; margin: 6px 0 14px; }
-
+    /* ── Table ────────────────────────────────────────────── */
     table { border-collapse: collapse; width: 100%; font-size: 13px; }
-    th, td { padding: 6px 10px; text-align: left; border-bottom: 1px solid #ececec; white-space: nowrap; }
-    th { position: sticky; top: 0; background: #eef1f5; cursor: pointer; user-select: none; font-weight: 600; }
-    th:hover { background: #e2e7ee; }
-    th .arrow { font-size: 10px; color: #888; }
-    tbody tr:hover td { background: #f5f9ff; }
+    th, td { padding: 7px 10px; text-align: left; border-bottom: 1px solid #eef0f4; white-space: nowrap; }
+    th {
+      position: sticky; top: 0; background: #f0f3f9; cursor: pointer;
+      user-select: none; font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .04em; color: #4a5568; z-index: 1;
+    }
+    th:hover { background: #e6ebf4; }
+    .arrow { font-size: 9px; color: #999; margin-left: 2px; }
+    tbody tr { cursor: pointer; }
+    tbody tr:hover td { background: #eef5ff; }
     td.num { text-align: right; font-variant-numeric: tabular-nums; }
-    .empty { padding: 30px; text-align: center; color: #888; }
-    .badge { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 11px; background: #e8eef6; color: #1f3a5f; }
-    #loading { padding: 40px; text-align: center; color: #777; font-size: 15px; }
+    td.addr-cell { font-weight: 600; color: #1b3557; max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+    .badge { display: inline-block; padding: 2px 7px; border-radius: 10px; font-size: 11px; font-weight: 500; background: #e6edf8; color: #1b3557; }
+    .empty { padding: 40px; text-align: center; color: #999; font-size: 14px; }
+    #loading { padding: 40px; text-align: center; color: #888; font-size: 14px; }
+
+    /* ── Modal overlay ────────────────────────────────────── */
+    #modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(10,20,40,.6);
+      z-index: 1000;
+      opacity: 0; pointer-events: none;
+      transition: opacity .2s ease;
+    }
+    #modal-overlay.open { opacity: 1; pointer-events: auto; }
+
+    /* ── Modal ────────────────────────────────────────────── */
+    #detail-modal {
+      position: fixed; top: 50%; left: 50%;
+      transform: translate(-50%, -50%) scale(.97);
+      width: min(980px, 96vw);
+      max-height: 90vh;
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: 0 32px 80px rgba(0,0,0,.32);
+      display: flex; flex-direction: column;
+      z-index: 1001;
+      opacity: 0; pointer-events: none;
+      transition: opacity .2s ease, transform .2s ease;
+      overflow: hidden;
+    }
+    #detail-modal.open {
+      opacity: 1; pointer-events: auto;
+      transform: translate(-50%, -50%) scale(1);
+    }
+
+    /* Modal header */
+    .mhdr {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 16px;
+      background: #1b3557; color: #fff;
+      flex-shrink: 0;
+    }
+    .mhdr-nav {
+      background: rgba(255,255,255,.15); color: #fff;
+      border: none; border-radius: 7px;
+      width: 36px; height: 36px; font-size: 18px;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; transition: background .1s;
+    }
+    .mhdr-nav:hover { background: rgba(255,255,255,.27); }
+    .mhdr-nav:disabled { opacity: .3; cursor: default; }
+    .mhdr-title { flex: 1; min-width: 0; }
+    .mhdr-addr { font-size: 13px; opacity: .8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .mhdr-price { font-size: 24px; font-weight: 800; line-height: 1.1; letter-spacing: -.5px; }
+    .mhdr-count { font-size: 12px; opacity: .65; white-space: nowrap; flex-shrink: 0; }
+    .mhdr-close {
+      background: rgba(255,255,255,.15); color: #fff;
+      border: none; border-radius: 7px;
+      width: 32px; height: 32px; font-size: 16px;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .mhdr-close:hover { background: rgba(255,255,255,.28); }
+
+    /* Modal body */
+    .mbody { display: flex; flex: 1; min-height: 0; overflow: hidden; }
+
+    /* Left: map panel */
+    .mpanel-map {
+      width: 42%; flex-shrink: 0;
+      display: flex; flex-direction: column;
+      background: #dde4ef;
+      border-right: 1px solid #e2e6ef;
+    }
+    #modal-mini-map { flex: 1; min-height: 0; }
+    .map-links {
+      padding: 8px 12px; display: flex; gap: 8px; flex-wrap: wrap;
+      background: #f4f6fa; border-top: 1px solid #dde1ea;
+      flex-shrink: 0;
+    }
+    .map-link {
+      font-size: 12px; font-weight: 500; color: #1b3557;
+      text-decoration: none; padding: 4px 10px;
+      background: #e6edf8; border-radius: 5px;
+    }
+    .map-link:hover { background: #d0dcf0; }
+
+    /* Right: details panel */
+    .mpanel-details {
+      flex: 1; overflow-y: auto;
+      padding: 18px 20px 24px;
+      display: flex; flex-direction: column; gap: 18px;
+    }
+
+    /* Tag row */
+    .tag-row { display: flex; flex-wrap: wrap; gap: 6px; }
+    .tag { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+    .tag-blue { background: #dbeafe; color: #1e3a8a; }
+    .tag-green { background: #d1fae5; color: #065f46; }
+    .tag-gray { background: #f1f3f6; color: #4b5563; }
+    .tag-amber { background: #fef3c7; color: #92400e; }
+
+    /* Stats grid */
+    .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .stat-chip { background: #f4f6fb; border-radius: 9px; padding: 10px 10px 8px; text-align: center; }
+    .stat-val { font-size: 20px; font-weight: 800; color: #1b3557; line-height: 1.1; }
+    .stat-lbl { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: #8892a4; margin-top: 3px; }
+
+    /* Detail sections */
+    .dsec { }
+    .dsec-title {
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .08em; color: #8892a4;
+      margin: 0 0 7px; padding-bottom: 5px;
+      border-bottom: 1px solid #eef0f4;
+    }
+    .drow { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 13px; padding: 4px 0; }
+    .dlbl { color: #6b7280; flex-shrink: 0; }
+    .dval { font-weight: 500; text-align: right; word-break: break-word; color: #1a1a1a; }
+
+    /* Contact card */
+    .ccard { background: #f8f9fb; border-radius: 9px; padding: 10px 13px; }
+    .ccard + .ccard { margin-top: 8px; }
+    .cname { font-weight: 700; font-size: 14px; color: #1a1a1a; margin-bottom: 5px; }
+    .cline { font-size: 12px; color: #4b5563; margin: 3px 0; display: flex; align-items: center; gap: 5px; }
+    .cline a { color: #1b3557; text-decoration: none; }
+    .cline a:hover { text-decoration: underline; }
+
+    /* Price history table */
+    .htbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .htbl th { text-align: left; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #8892a4; padding: 3px 6px; border-bottom: 1px solid #e5e8ec; }
+    .htbl td { padding: 5px 6px; border-bottom: 1px solid #f2f4f7; color: #1a1a1a; }
+    .htbl tr:last-child td { border-bottom: none; }
+
+    /* No-map placeholder */
+    .nomap { display: flex; align-items: center; justify-content: center; flex: 1; color: #8892a4; font-size: 13px; text-align: center; padding: 20px; }
+
+    /* ── Responsive ───────────────────────────────────────── */
+    @media (max-width: 700px) {
+      .mbody { flex-direction: column; }
+      .mpanel-map { width: 100%; height: 220px; border-right: none; border-bottom: 1px solid #dde1ea; }
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    }
   </style>
 </head>
 <body>
   <header>
-    <h1>NY &amp; VT Real Estate Listings</h1>
+    <h1>VT Real Estate Listings</h1>
     <span class="meta" id="header-meta"></span>
   </header>
 
-  <div class="layout">
+  <!-- Modal backdrop -->
+  <div id="modal-overlay" onclick="closeModal()"></div>
+
+  <!-- Detail modal -->
+  <div id="detail-modal" role="dialog" aria-modal="true">
+    <div class="mhdr">
+      <button class="mhdr-nav" id="mprev" title="Previous (←)">&#8592;</button>
+      <div class="mhdr-title">
+        <div class="mhdr-addr" id="maddr"></div>
+        <div class="mhdr-price" id="mprice"></div>
+      </div>
+      <div class="mhdr-count" id="mcount"></div>
+      <button class="mhdr-nav" id="mnext" title="Next (→)">&#8594;</button>
+      <button class="mhdr-close" id="mclose" title="Close (Esc)">&#10005;</button>
+    </div>
+    <div class="mbody">
+      <div class="mpanel-map">
+        <div id="modal-mini-map"></div>
+        <div class="map-links">
+          <a class="map-link" id="ml-gmaps" href="#" target="_blank" rel="noopener">&#128205; Google Maps</a>
+          <a class="map-link" id="ml-sv"    href="#" target="_blank" rel="noopener">&#128247; Street View</a>
+          <a class="map-link" id="ml-sat"   href="#" target="_blank" rel="noopener">&#128752; Satellite</a>
+        </div>
+      </div>
+      <div class="mpanel-details" id="mdetails"></div>
+    </div>
+  </div>
+
+  <!-- Main layout -->
+  <div class="shell">
     <aside>
+      <div class="fs-title">Price</div>
       <div class="field">
-        <label>Price ($)</label>
         <div class="row2">
-          <input type="number" id="price_min" placeholder="Min">
-          <input type="number" id="price_max" placeholder="Max">
+          <input type="number" id="price_min" placeholder="Min $">
+          <input type="number" id="price_max" placeholder="Max $">
         </div>
       </div>
 
+      <div class="fs-title">Location</div>
       <div class="field">
-        <label for="zip">ZIP code</label>
-        <select id="zip"><option value="">All ZIPs</option></select>
+        <label for="fzip">ZIP Code</label>
+        <select id="fzip"><option value="">All ZIPs</option></select>
+      </div>
+      <div class="field">
+        <label for="fcity">City / Town</label>
+        <select id="fcity"><option value="">All Cities</option></select>
+      </div>
+      <div class="field">
+        <label for="fcounty">County</label>
+        <select id="fcounty"><option value="">All Counties</option></select>
       </div>
 
+      <div class="fs-title">Property</div>
       <div class="field">
-        <label>Minimum beds / baths</label>
+        <label>Min Beds / Baths</label>
         <div class="row2">
           <input type="number" id="beds_min" placeholder="Beds" min="0">
           <input type="number" id="baths_min" placeholder="Baths" min="0">
         </div>
       </div>
-
-      <div class="field checks">
-        <label style="text-transform:uppercase;font-size:12px;color:#444;font-weight:600;cursor:default;">Property type</label>
-        <div id="categories"></div>
+      <div class="field">
+        <label>Max Days on Market</label>
+        <input type="number" id="dom_max" placeholder="Any">
       </div>
 
+      <div class="fs-title">Type</div>
+      <div class="checks" id="categories"></div>
+
       <div class="btns">
-        <button class="btn-primary" id="apply">Apply filters</button>
-        <button class="btn-secondary" id="reset">Reset</button>
+        <button class="btn-primary" id="apply">Apply</button>
+        <button class="btn-reset" id="reset">Reset</button>
       </div>
 
       <p class="count" id="count"></p>
-      <button class="btn-export" id="export">⬇ Export to Excel</button>
+      <button class="btn-export" id="export">&#8595; Export to Excel</button>
     </aside>
 
     <main>
       <div id="map"></div>
       <div class="table-wrap">
-        <div id="loading">Loading listings…</div>
-        <table id="table" style="display:none;">
+        <div id="loading">Loading listings&hellip;</div>
+        <table id="table" style="display:none">
           <thead><tr id="thead-row"></tr></thead>
           <tbody id="tbody"></tbody>
         </table>
-        <div class="empty" id="empty" style="display:none;">No listings match these filters.</div>
+        <div class="empty" id="empty" style="display:none">No listings match these filters.</div>
       </div>
     </main>
   </div>
@@ -107,221 +319,447 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+
   <script>
-    const UI_CATEGORIES = ['residential', 'condo', 'apartment', 'land', 'commercial'];
+  'use strict';
 
-    const COLUMNS = [
-      { key: 'address',       label: 'Address',  num: false },
-      { key: 'city',          label: 'City',     num: false },
-      { key: 'zip',           label: 'ZIP',      num: false },
-      { key: 'price',         label: 'Price',    num: true,  fmt: v => v == null ? '' : '$' + v.toLocaleString() },
-      { key: 'bedrooms',      label: 'Beds',     num: true },
-      { key: 'bathrooms',     label: 'Baths',    num: true },
-      { key: 'squareFootage', label: 'Sq Ft',    num: true,  fmt: v => v == null ? '' : v.toLocaleString() },
-      { key: 'propertyType',  label: 'Type',     num: false },
-      { key: 'category',      label: 'Category', num: false, fmt: v => `<span class="badge">${v ?? ''}</span>` },
-      { key: 'daysOnMarket',  label: 'DOM',      num: true },
-    ];
+  /* ── Constants ─────────────────────────────────────────── */
 
-    // Excel export columns (mirror scripts/report_listings_excel.py)
-    const XLSX_COLUMNS = [
-      ['Address','address'], ['City','city'], ['State','state'], ['ZIP','zip'],
-      ['Price','price'], ['Beds','bedrooms'], ['Baths','bathrooms'],
-      ['Sq Ft','squareFootage'], ['Lot Size','lotSize'], ['Year Built','yearBuilt'],
-      ['Type','propertyType'], ['Category','category'], ['Days on Mkt','daysOnMarket'],
-      ['Listed','listedDate'], ['Link','url'],
-    ];
+  const UI_CATEGORIES = ['residential','condo','apartment','land','commercial'];
 
-    let ALL = [];        // every listing loaded from listings.json
-    let listings = [];   // current filtered set
-    let sortKey = 'price';
-    let sortAsc = false;
+  const COLUMNS = [
+    { key:'address',       label:'Address',  num:false },
+    { key:'city',          label:'City',     num:false },
+    { key:'zip',           label:'ZIP',      num:false },
+    { key:'price',         label:'Price',    num:true,  fmt: v => v==null?'':'$'+v.toLocaleString() },
+    { key:'bedrooms',      label:'Beds',     num:true },
+    { key:'bathrooms',     label:'Baths',    num:true },
+    { key:'squareFootage', label:'Sq Ft',    num:true,  fmt: v => v==null?'':v.toLocaleString() },
+    { key:'propertyType',  label:'Type',     num:false },
+    { key:'daysOnMarket',  label:'DOM',      num:true },
+    { key:'yearBuilt',     label:'Built',    num:true },
+  ];
 
-    // --- Map setup ---
-    const map = L.map('map').setView([43.5, -74.5], 6); // NY/VT region
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors', maxZoom: 19,
-    }).addTo(map);
-    const cluster = L.markerClusterGroup();
-    map.addLayer(cluster);
+  const XLSX_COLS = [
+    ['Address','address'],['City','city'],['State','state'],['ZIP','zip'],
+    ['County','county'],['Price','price'],['Beds','bedrooms'],['Baths','bathrooms'],
+    ['Sq Ft','squareFootage'],['Lot Size','lotSize'],['Year Built','yearBuilt'],
+    ['Type','propertyType'],['Category','category'],['DOM','daysOnMarket'],
+    ['Listed','listedDate'],['MLS','mlsName'],['MLS #','mlsNumber'],
+    ['Agent','agentName'],['Agent Phone','agentPhone'],['Agent Email','agentEmail'],
+    ['Office','officeName'],['Office Phone','officePhone'],
+  ];
 
-    // --- Filter controls ---
-    function buildCategoryChecks() {
-      const wrap = document.getElementById('categories');
-      UI_CATEGORIES.forEach(cat => {
-        const id = 'cat_' + cat;
-        const label = document.createElement('label');
-        label.innerHTML = `<input type="checkbox" id="${id}" value="${cat}" checked> ${cat.charAt(0).toUpperCase() + cat.slice(1)}`;
-        wrap.appendChild(label);
-        if (cat === 'commercial') {
-          const note = document.createElement('div');
-          note.className = 'note';
-          note.textContent = 'No data from current source';
-          wrap.appendChild(note);
-        }
-      });
-    }
+  /* ── State ─────────────────────────────────────────────── */
 
-    function buildZipOptions() {
-      const zips = [...new Set(ALL.map(l => l.zip).filter(Boolean).map(String))].sort();
-      const sel = document.getElementById('zip');
-      zips.forEach(z => {
-        const opt = document.createElement('option');
-        opt.value = z; opt.textContent = z;
-        sel.appendChild(opt);
-      });
-    }
+  let ALL = [], listings = [], sorted = [];
+  let sortKey = 'price', sortAsc = false;
+  let modalIdx = -1;
+  let miniMap = null, miniMarker = null;
 
-    function selectedCategories() {
-      return UI_CATEGORIES.filter(c => {
-        const el = document.getElementById('cat_' + c);
-        return el && el.checked;
-      });
-    }
+  /* ── Helpers ───────────────────────────────────────────── */
 
-    // Client-side equivalent of the server's filter_listings().
-    function filterListings() {
-      const num = id => { const v = document.getElementById(id).value; return v === '' ? null : Number(v); };
-      const priceMin = num('price_min'), priceMax = num('price_max');
-      const bedsMin = num('beds_min'), bathsMin = num('baths_min');
-      const zip = document.getElementById('zip').value || null;
-      const cats = selectedCategories();
-      const catSet = cats.length < UI_CATEGORIES.length ? new Set(cats) : null;
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const num = id => { const v=$(id).value; return v===''?null:Number(v); };
 
-      return ALL.filter(L => {
-        if (priceMin != null && (L.price == null || L.price < priceMin)) return false;
-        if (priceMax != null && (L.price == null || L.price > priceMax)) return false;
-        if (zip && String(L.zip) !== String(zip)) return false;
-        if (bedsMin != null && (L.bedrooms == null || L.bedrooms < bedsMin)) return false;
-        if (bathsMin != null && (L.bathrooms == null || L.bathrooms < bathsMin)) return false;
-        if (catSet && !catSet.has(L.category)) return false;
-        return true;
-      });
-    }
+  function fmtDate(iso) {
+    if (!iso) return null;
+    return new Date(iso).toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'});
+  }
 
-    function applyFilters() {
-      listings = filterListings();
-      document.getElementById('count').textContent =
-        listings.length.toLocaleString() + ' of ' + ALL.length.toLocaleString() + ' listings';
-      renderTable();
-      renderMap();
-    }
+  function fmtPhone(p) {
+    if (!p) return null;
+    const d = p.replace(/\D/g,'');
+    if (d.length===10) return `(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`;
+    if (d.length===11&&d[0]==='1') return `+1 (${d.slice(1,4)}) ${d.slice(4,7)}-${d.slice(7)}`;
+    return p;
+  }
 
-    function resetFilters() {
-      ['price_min','price_max','zip','beds_min','baths_min'].forEach(id => document.getElementById(id).value = '');
-      UI_CATEGORIES.forEach(c => { const el = document.getElementById('cat_' + c); if (el) el.checked = true; });
-      applyFilters();
-    }
+  function fmtLot(sf) {
+    if (!sf) return null;
+    return sf >= 43560 ? (sf/43560).toFixed(2)+' ac' : sf.toLocaleString()+' sf';
+  }
 
-    // --- Table ---
-    function renderHead() {
-      const tr = document.getElementById('thead-row');
-      tr.innerHTML = '';
-      COLUMNS.forEach(col => {
-        const th = document.createElement('th');
-        const arrow = sortKey === col.key ? (sortAsc ? ' ▲' : ' ▼') : '';
-        th.innerHTML = col.label + `<span class="arrow">${arrow}</span>`;
-        th.onclick = () => {
-          if (sortKey === col.key) sortAsc = !sortAsc;
-          else { sortKey = col.key; sortAsc = true; }
-          renderTable();
-        };
-        tr.appendChild(th);
-      });
-    }
+  /* ── Main Leaflet map ───────────────────────────────────── */
 
-    function renderTable() {
-      renderHead();
-      const sorted = [...listings].sort((a, b) => {
-        const av = a[sortKey], bv = b[sortKey];
-        if (av == null && bv == null) return 0;
-        if (av == null) return 1;
-        if (bv == null) return -1;
-        if (av < bv) return sortAsc ? -1 : 1;
-        if (av > bv) return sortAsc ? 1 : -1;
-        return 0;
-      });
-      const tbody = document.getElementById('tbody');
-      tbody.innerHTML = '';
-      document.getElementById('empty').style.display = sorted.length ? 'none' : 'block';
-      const frag = document.createDocumentFragment();
-      sorted.forEach(L => {
-        const tr = document.createElement('tr');
-        COLUMNS.forEach(col => {
-          const td = document.createElement('td');
-          if (col.num) td.className = 'num';
-          const raw = L[col.key];
-          let html = col.fmt ? col.fmt(raw) : (raw ?? '');
-          if (col.key === 'address' && L.url) {
-            html = `<a href="${L.url}" target="_blank" rel="noopener">${raw ?? ''}</a>`;
-          }
-          td.innerHTML = html;
-          tr.appendChild(td);
-        });
-        frag.appendChild(tr);
-      });
-      tbody.appendChild(frag);
-    }
+  const mainMap = L.map('map').setView([43.9, -72.7], 7);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    attribution:'© OpenStreetMap contributors', maxZoom:19,
+  }).addTo(mainMap);
+  const cluster = L.markerClusterGroup();
+  mainMap.addLayer(cluster);
 
-    // --- Map markers ---
-    function renderMap() {
-      cluster.clearLayers();
-      const markers = [];
-      listings.forEach(L => {
-        if (L.lat == null || L.lng == null) return;
-        const price = L.price == null ? 'N/A' : '$' + L.price.toLocaleString();
-        const m = window.L.marker([L.lat, L.lng]);
-        m.bindPopup(
-          `<strong>${price}</strong><br>${L.address ?? ''}<br>` +
-          `${L.bedrooms ?? '?'} bd / ${L.bathrooms ?? '?'} ba · ${L.propertyType ?? ''}` +
-          (L.url ? `<br><a href="${L.url}" target="_blank" rel="noopener">View</a>` : '')
-        );
-        markers.push(m);
-      });
-      cluster.addLayers(markers);
-      // Defer so the flex container has its final size before Leaflet measures it.
-      requestAnimationFrame(() => {
-        map.invalidateSize();
-        if (markers.length) map.fitBounds(cluster.getBounds().pad(0.2));
-      });
-    }
+  /* ── Filter sidebar ─────────────────────────────────────── */
 
-    // --- Excel export (client-side via SheetJS) ---
-    function exportExcel() {
-      const aoa = [XLSX_COLUMNS.map(c => c[0])];
-      listings.forEach(L => aoa.push(XLSX_COLUMNS.map(c => L[c[1]] ?? null)));
-      const ws = XLSX.utils.aoa_to_sheet(aoa);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Listings');
-      XLSX.writeFile(wb, 'listings.xlsx');
-    }
-
-    // --- Init ---
-    async function init() {
-      let data;
-      try {
-        data = await fetch('listings.json').then(r => r.json());
-      } catch (e) {
-        document.getElementById('loading').textContent = 'Failed to load listings.json';
-        return;
+  function buildCategoryChecks() {
+    const wrap = $('categories');
+    UI_CATEGORIES.forEach(cat => {
+      const lbl = document.createElement('label');
+      lbl.innerHTML = `<input type="checkbox" id="cat_${cat}" value="${cat}" checked> ${cat.charAt(0).toUpperCase()+cat.slice(1)}`;
+      wrap.appendChild(lbl);
+      if (cat==='commercial') {
+        const note = document.createElement('div');
+        note.className = 'note';
+        note.textContent = 'No data from current source';
+        wrap.appendChild(note);
       }
-      ALL = data.listings || [];
-      document.getElementById('header-meta').textContent =
-        `${ALL.length.toLocaleString()} listings` +
-        (data.states && data.states.length ? ` · ${data.states.join(', ')}` : '') +
-        (data.fetched_at ? ` · fetched ${data.fetched_at.slice(0,10)}` : '');
-      buildCategoryChecks();
-      buildZipOptions();
-      document.getElementById('loading').style.display = 'none';
-      document.getElementById('table').style.display = '';
-      document.getElementById('apply').onclick = applyFilters;
-      document.getElementById('reset').onclick = resetFilters;
-      document.getElementById('export').onclick = exportExcel;
-      window.addEventListener('resize', () => map.invalidateSize());
-      applyFilters();
+    });
+  }
+
+  function buildSelect(id, vals) {
+    const sel = $(id);
+    vals.forEach(v => {
+      const o = document.createElement('option');
+      o.value = v; o.textContent = v;
+      sel.appendChild(o);
+    });
+  }
+
+  function buildSelects() {
+    const zips    = [...new Set(ALL.map(l=>l.zip).filter(Boolean).map(String))].sort();
+    const cities  = [...new Set(ALL.map(l=>l.city).filter(Boolean))].sort();
+    const counties= [...new Set(ALL.map(l=>l.county).filter(Boolean))].sort();
+    buildSelect('fzip',    zips);
+    buildSelect('fcity',   cities);
+    buildSelect('fcounty', counties);
+  }
+
+  function selectedCats() {
+    return UI_CATEGORIES.filter(c => { const el=$('cat_'+c); return el&&el.checked; });
+  }
+
+  function filterListings() {
+    const pMin=num('price_min'), pMax=num('price_max');
+    const bMin=num('beds_min'),  baMin=num('baths_min'), domMax=num('dom_max');
+    const zip=$('fzip').value||null, city=$('fcity').value||null, county=$('fcounty').value||null;
+    const cats=selectedCats();
+    const catSet = cats.length<UI_CATEGORIES.length ? new Set(cats) : null;
+    return ALL.filter(L => {
+      if (pMin!=null&&(L.price==null||L.price<pMin)) return false;
+      if (pMax!=null&&(L.price==null||L.price>pMax)) return false;
+      if (zip&&String(L.zip)!==zip) return false;
+      if (city&&L.city!==city) return false;
+      if (county&&L.county!==county) return false;
+      if (bMin!=null&&(L.bedrooms==null||L.bedrooms<bMin)) return false;
+      if (baMin!=null&&(L.bathrooms==null||L.bathrooms<baMin)) return false;
+      if (domMax!=null&&(L.daysOnMarket==null||L.daysOnMarket>domMax)) return false;
+      if (catSet&&!catSet.has(L.category)) return false;
+      return true;
+    });
+  }
+
+  function applyFilters() {
+    listings = filterListings();
+    $('count').textContent = listings.length.toLocaleString()+' of '+ALL.length.toLocaleString()+' listings';
+    renderTable();
+    renderMainMap();
+  }
+
+  function resetFilters() {
+    ['price_min','price_max','fzip','fcity','fcounty','beds_min','baths_min','dom_max'].forEach(id=>$(id).value='');
+    UI_CATEGORIES.forEach(c=>{const el=$('cat_'+c);if(el)el.checked=true;});
+    applyFilters();
+  }
+
+  /* ── Table ──────────────────────────────────────────────── */
+
+  function renderHead() {
+    const tr=$('thead-row');
+    tr.innerHTML='';
+    COLUMNS.forEach(col=>{
+      const th=document.createElement('th');
+      const arrow=sortKey===col.key?(sortAsc?' ▲':' ▼'):'';
+      th.innerHTML=esc(col.label)+`<span class="arrow">${arrow}</span>`;
+      th.onclick=()=>{
+        if(sortKey===col.key)sortAsc=!sortAsc;
+        else{sortKey=col.key;sortAsc=true;}
+        renderTable();
+      };
+      tr.appendChild(th);
+    });
+  }
+
+  function renderTable() {
+    renderHead();
+    sorted=[...listings].sort((a,b)=>{
+      const av=a[sortKey],bv=b[sortKey];
+      if(av==null&&bv==null)return 0;
+      if(av==null)return 1; if(bv==null)return -1;
+      return sortAsc?(av<bv?-1:av>bv?1:0):(av<bv?1:av>bv?-1:0);
+    });
+    const tbody=$('tbody');
+    tbody.innerHTML='';
+    $('empty').style.display=sorted.length?'none':'block';
+    const frag=document.createDocumentFragment();
+    sorted.forEach((L,i)=>{
+      const tr=document.createElement('tr');
+      tr.title='Click to view details';
+      tr.onclick=()=>openModal(i);
+      COLUMNS.forEach(col=>{
+        const td=document.createElement('td');
+        if(col.num)td.className='num';
+        const raw=L[col.key];
+        if(col.key==='address'){
+          td.className='addr-cell';
+          td.textContent=raw??'';
+        } else {
+          td.innerHTML=col.fmt?col.fmt(raw):esc(raw??'');
+        }
+        tr.appendChild(td);
+      });
+      frag.appendChild(tr);
+    });
+    tbody.appendChild(frag);
+  }
+
+  /* ── Main map markers ───────────────────────────────────── */
+
+  function renderMainMap() {
+    cluster.clearLayers();
+    const markers=[];
+    sorted.forEach((L,i)=>{
+      if(L.lat==null||L.lng==null)return;
+      const m=window.L.marker([L.lat,L.lng]);
+      const price=L.price==null?'N/A':'$'+L.price.toLocaleString();
+      m.bindTooltip(
+        `<strong>${price}</strong><br>${esc(L.address??'')}<br>`+
+        `${L.bedrooms??'?'} bd / ${L.bathrooms??'?'} ba`,
+        {direction:'top'}
+      );
+      m.on('click',()=>openModal(i));
+      markers.push(m);
+    });
+    cluster.addLayers(markers);
+    requestAnimationFrame(()=>{
+      mainMap.invalidateSize();
+      if(markers.length)mainMap.fitBounds(cluster.getBounds().pad(.15));
+    });
+  }
+
+  /* ── Modal ──────────────────────────────────────────────── */
+
+  function openModal(idx) {
+    modalIdx=idx;
+    renderModal(sorted[idx]);
+    $('modal-overlay').classList.add('open');
+    $('detail-modal').classList.add('open');
+    document.body.style.overflow='hidden';
+  }
+
+  function closeModal() {
+    $('modal-overlay').classList.remove('open');
+    $('detail-modal').classList.remove('open');
+    document.body.style.overflow='';
+  }
+
+  function navigateModal(dir) {
+    const next=modalIdx+dir;
+    if(next<0||next>=sorted.length)return;
+    openModal(next);
+  }
+
+  function renderModal(L) {
+    /* Header */
+    $('maddr').textContent=L.address??'';
+    $('mprice').textContent=L.price!=null?'$'+L.price.toLocaleString():'Price not listed';
+    $('mcount').textContent=`${modalIdx+1} / ${sorted.length}`;
+    $('mprev').disabled=modalIdx<=0;
+    $('mnext').disabled=modalIdx>=sorted.length-1;
+
+    /* Map links */
+    const lat=L.lat, lng=L.lng;
+    const addrQ=encodeURIComponent(L.address??'');
+    if(lat!=null&&lng!=null){
+      $('ml-gmaps').href=`https://www.google.com/maps?q=${lat},${lng}&z=17`;
+      $('ml-sv').href=`https://www.google.com/maps/@${lat},${lng},3a,75y,90t/data=!3m5!1e1`;
+      $('ml-sat').href=`https://www.google.com/maps/@${lat},${lng},17z/data=!3m1!1e3`;
+    } else {
+      $('ml-gmaps').href=`https://www.google.com/maps/search/?api=1&query=${addrQ}`;
+      $('ml-sv').href=`https://www.google.com/maps/search/?api=1&query=${addrQ}`;
+      $('ml-sat').href=`https://www.google.com/maps/search/?api=1&query=${addrQ}`;
     }
 
-    init();
+    /* Mini Leaflet map */
+    updateMiniMap(lat, lng, L.address);
+
+    /* Details panel */
+    $('mdetails').innerHTML=buildDetails(L);
+  }
+
+  /* Initialize/update the mini Leaflet map in the modal */
+  function updateMiniMap(lat, lng, address) {
+    const container=$('modal-mini-map');
+    if(lat==null||lng==null){
+      container.innerHTML='<div class="nomap">Location coordinates not available</div>';
+      miniMap=null; miniMarker=null;
+      return;
+    }
+    /* On first open, initialize the Leaflet map */
+    if(!miniMap){
+      miniMap=L.map('modal-mini-map',{zoomControl:true,scrollWheelZoom:false,attributionControl:false});
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(miniMap);
+      L.control.attribution({prefix:false}).addTo(miniMap);
+    }
+    /* Always invalidate + pan after a short delay so the modal transition finishes */
+    setTimeout(()=>{
+      miniMap.invalidateSize();
+      miniMap.setView([lat,lng],16);
+      if(miniMarker){
+        miniMarker.setLatLng([lat,lng]);
+      } else {
+        miniMarker=L.marker([lat,lng]).addTo(miniMap);
+        if(address)miniMarker.bindPopup(esc(address));
+      }
+    },60);
+  }
+
+  /* Build the HTML for the right-side details panel */
+  function buildDetails(L) {
+    let h='';
+
+    /* Tag row */
+    h+='<div class="tag-row">';
+    if(L.propertyType) h+=`<span class="tag tag-blue">${esc(L.propertyType)}</span>`;
+    if(L.status==='Active') h+=`<span class="tag tag-green">Active</span>`;
+    else if(L.status) h+=`<span class="tag tag-amber">${esc(L.status)}</span>`;
+    if(L.listingType&&L.listingType!=='Standard') h+=`<span class="tag tag-gray">${esc(L.listingType)}</span>`;
+    if(L.category) h+=`<span class="tag tag-gray">${esc(L.category)}</span>`;
+    h+='</div>';
+
+    /* Stats grid */
+    const ppsf=(L.price&&L.squareFootage)?Math.round(L.price/L.squareFootage):null;
+    const stats=[
+      {v:L.bedrooms??'—',   l:'Bedrooms'},
+      {v:L.bathrooms??'—',  l:'Bathrooms'},
+      {v:L.squareFootage!=null?L.squareFootage.toLocaleString():'—', l:'Sq Ft'},
+      {v:ppsf!=null?'$'+ppsf.toLocaleString():'—', l:'Per Sq Ft'},
+      {v:fmtLot(L.lotSize)??'—', l:'Lot Size'},
+      {v:L.yearBuilt??'—',  l:'Year Built'},
+    ];
+    h+='<div class="stats-grid">';
+    stats.forEach(s=>{ h+=`<div class="stat-chip"><div class="stat-val">${esc(String(s.v))}</div><div class="stat-lbl">${esc(s.l)}</div></div>`; });
+    h+='</div>';
+
+    /* Listing Details */
+    h+='<div class="dsec"><div class="dsec-title">Listing Details</div>';
+    const drows=[
+      ['Listed',         fmtDate(L.listedDate)],
+      ['Days on Market', L.daysOnMarket!=null?L.daysOnMarket+' days':null],
+      ['Last Seen',      fmtDate(L.lastSeenDate)],
+      ['Listing Type',   L.listingType],
+      ['County',         L.county],
+      ['State',          L.state],
+      ['MLS',            L.mlsName],
+      ['MLS #',          L.mlsNumber],
+    ];
+    drows.forEach(([lbl,val])=>{
+      if(!val)return;
+      h+=`<div class="drow"><span class="dlbl">${esc(lbl)}</span><span class="dval">${esc(val)}</span></div>`;
+    });
+    h+='</div>';
+
+    /* Agent */
+    const ag=L.listingAgent;
+    if(ag&&(ag.name||ag.phone||ag.email)){
+      h+='<div class="dsec"><div class="dsec-title">Listing Agent</div><div class="ccard">';
+      if(ag.name) h+=`<div class="cname">${esc(ag.name)}</div>`;
+      if(ag.phone){const fp=fmtPhone(ag.phone)||ag.phone; h+=`<div class="cline">📞 <a href="tel:${esc(ag.phone)}">${esc(fp)}</a></div>`;}
+      if(ag.email) h+=`<div class="cline">✉️ <a href="mailto:${esc(ag.email)}">${esc(ag.email)}</a></div>`;
+      h+='</div></div>';
+    }
+
+    /* Office */
+    const off=L.listingOffice;
+    if(off&&(off.name||off.phone||off.email)){
+      h+='<div class="dsec"><div class="dsec-title">Brokerage</div><div class="ccard">';
+      if(off.name) h+=`<div class="cname">${esc(off.name)}</div>`;
+      if(off.phone){const fp=fmtPhone(off.phone)||off.phone; h+=`<div class="cline">📞 <a href="tel:${esc(off.phone)}">${esc(fp)}</a></div>`;}
+      if(off.email) h+=`<div class="cline">✉️ <a href="mailto:${esc(off.email)}">${esc(off.email)}</a></div>`;
+      h+='</div></div>';
+    }
+
+    /* Price history */
+    if(L.history&&Object.keys(L.history).length>0){
+      const entries=Object.entries(L.history).sort((a,b)=>b[0].localeCompare(a[0]));
+      h+='<div class="dsec"><div class="dsec-title">Price History</div>';
+      h+='<table class="htbl"><thead><tr><th>Date</th><th>Event</th><th>Price</th></tr></thead><tbody>';
+      entries.forEach(([date,ev])=>{
+        const price=ev.price!=null?'$'+ev.price.toLocaleString():'—';
+        h+=`<tr><td>${esc(date)}</td><td>${esc(ev.event??'')}</td><td>${esc(price)}</td></tr>`;
+      });
+      h+='</tbody></table></div>';
+    }
+
+    /* External search link */
+    if(L.url){
+      h+=`<div style="margin-top:4px"><a href="${esc(L.url)}" target="_blank" rel="noopener" style="font-size:12px;color:#1b3557;">🔍 Search this property online</a></div>`;
+    }
+
+    return h;
+  }
+
+  /* ── Excel export ────────────────────────────────────────── */
+
+  function exportExcel() {
+    const aoa=[XLSX_COLS.map(c=>c[0])];
+    sorted.forEach(L=>{
+      const row=XLSX_COLS.map(([,k])=>{
+        if(k==='agentName')   return L.listingAgent?.name??null;
+        if(k==='agentPhone')  return L.listingAgent?.phone??null;
+        if(k==='agentEmail')  return L.listingAgent?.email??null;
+        if(k==='officeName')  return L.listingOffice?.name??null;
+        if(k==='officePhone') return L.listingOffice?.phone??null;
+        return L[k]??null;
+      });
+      aoa.push(row);
+    });
+    const ws=XLSX.utils.aoa_to_sheet(aoa);
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,'Listings');
+    XLSX.writeFile(wb,'listings.xlsx');
+  }
+
+  /* ── Keyboard shortcuts ──────────────────────────────────── */
+
+  document.addEventListener('keydown',e=>{
+    if(!$('detail-modal').classList.contains('open'))return;
+    if(e.key==='Escape')closeModal();
+    if(e.key==='ArrowLeft'||e.key==='ArrowUp'){e.preventDefault();navigateModal(-1);}
+    if(e.key==='ArrowRight'||e.key==='ArrowDown'){e.preventDefault();navigateModal(1);}
+  });
+
+  /* ── Init ────────────────────────────────────────────────── */
+
+  async function init() {
+    let data;
+    try { data=await fetch('listings.json',{cache:'no-store'}).then(r=>r.json()); }
+    catch(e){ $('loading').textContent='Failed to load listings.json'; return; }
+
+    ALL=data.listings||[];
+    $('header-meta').textContent=
+      `${ALL.length.toLocaleString()} listings`+
+      (data.states?.length?` · ${data.states.join(', ')}`:'') +
+      (data.fetched_at?` · fetched ${data.fetched_at.slice(0,10)}`:'');
+
+    buildCategoryChecks();
+    buildSelects();
+
+    $('loading').style.display='none';
+    $('table').style.display='';
+
+    $('apply').onclick=applyFilters;
+    $('reset').onclick=resetFilters;
+    $('export').onclick=exportExcel;
+    $('mprev').onclick=()=>navigateModal(-1);
+    $('mnext').onclick=()=>navigateModal(1);
+    $('mclose').onclick=closeModal;
+
+    window.addEventListener('resize',()=>mainMap.invalidateSize());
+    applyFilters();
+  }
+
+  init();
   </script>
 </body>
 </html>
