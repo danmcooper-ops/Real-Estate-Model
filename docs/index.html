@@ -243,6 +243,9 @@
       header .meta { display: none; }
       .filter-btn { display: block; }
 
+      /* Drop Leaflet controls below the sidebar/backdrop */
+      .leaflet-top, .leaflet-bottom { z-index: 400; }
+
       /* Sidebar: slide-in drawer */
       aside {
         position: fixed;
