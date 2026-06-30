@@ -61,6 +61,25 @@
     #map { height: 42%; min-height: 200px; }
     .table-wrap { flex: 1; overflow: auto; }
 
+    /* ── List toggle divider ──────────────────────────────── */
+    .list-divider {
+      display: flex; align-items: center; justify-content: center;
+      height: 22px; flex-shrink: 0;
+      background: #e8ebf0; border-top: 1px solid #d0d5df; border-bottom: 1px solid #d0d5df;
+    }
+    #list-toggle {
+      background: #fff; border: 1px solid #c8cdd8; border-radius: 10px;
+      padding: 1px 12px; font-size: 11px; font-weight: 600; color: #4a5568;
+      cursor: pointer; line-height: 18px; box-shadow: 0 1px 3px rgba(0,0,0,.08);
+      transition: background .12s;
+    }
+    #list-toggle:hover { background: #f0f3f9; }
+
+    /* When list is hidden, map fills the full content area */
+    body.list-hidden .table-wrap { display: none; }
+    body.list-hidden .list-divider { border-bottom: none; }
+    body.list-hidden #map { height: auto; flex: 1; min-height: 0; }
+
     /* ── Table ────────────────────────────────────────────── */
     table { border-collapse: collapse; width: 100%; font-size: 13px; }
     th, td { padding: 7px 10px; text-align: left; border-bottom: 1px solid #eef0f4; white-space: nowrap; }
@@ -441,6 +460,9 @@
 
     <main>
       <div id="map"></div>
+      <div class="list-divider">
+        <button id="list-toggle" onclick="toggleList()">&#9660; Hide list</button>
+      </div>
       <div class="table-wrap">
         <div id="loading">Loading listings&hellip;</div>
         <table id="table" style="display:none">
@@ -866,6 +888,12 @@
   function closeSidebar() {
     document.querySelector('aside').classList.remove('sidebar-open');
     $('sidebar-backdrop').classList.remove('open');
+  }
+
+  function toggleList() {
+    const hidden = document.body.classList.toggle('list-hidden');
+    $('list-toggle').innerHTML = hidden ? '&#9650; Show list' : '&#9660; Hide list';
+    map.invalidateSize();
   }
 
   /* ── Keyboard shortcuts ──────────────────────────────────── */
