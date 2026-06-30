@@ -57,7 +57,7 @@
     .count { font-size: 12px; color: #666; margin: 10px 0 0; font-weight: 500; }
 
     /* ── Main ─────────────────────────────────────────────── */
-    main { flex: 1; display: flex; flex-direction: column; min-width: 0; background: #fff; }
+    main { flex: 1; display: flex; flex-direction: column; min-width: 0; background: #fff; position: relative; }
     #map { height: 42%; min-height: 200px; }
     .table-wrap { flex: 1; overflow: auto; }
 
@@ -75,9 +75,22 @@
     }
     #list-toggle:hover { background: #f0f3f9; }
 
-    /* When list is hidden, table disappears; JS sets map height explicitly */
+    /* When list is hidden: table gone, divider floats over the map bottom */
     body.list-hidden .table-wrap { display: none; }
-    body.list-hidden .list-divider { border-bottom: none; }
+    body.list-hidden .list-divider {
+      position: absolute;
+      bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+      left: 50%; transform: translateX(-50%);
+      height: auto; background: transparent; border: none;
+      z-index: 500;
+    }
+    body.list-hidden #list-toggle {
+      background: rgba(27,53,87,.88);
+      color: #fff; border-color: transparent;
+      box-shadow: 0 2px 8px rgba(0,0,0,.35);
+      padding: 6px 18px; font-size: 13px; border-radius: 20px;
+    }
+    body.list-hidden #list-toggle:hover { background: rgba(27,53,87,1); }
 
     /* ── Table ────────────────────────────────────────────── */
     table { border-collapse: collapse; width: 100%; font-size: 13px; }
