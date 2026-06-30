@@ -75,10 +75,9 @@
     }
     #list-toggle:hover { background: #f0f3f9; }
 
-    /* When list is hidden, map fills the full content area */
+    /* When list is hidden, table disappears; JS sets map height explicitly */
     body.list-hidden .table-wrap { display: none; }
     body.list-hidden .list-divider { border-bottom: none; }
-    body.list-hidden #map { height: auto; flex: 1; min-height: 0; }
 
     /* ── Table ────────────────────────────────────────────── */
     table { border-collapse: collapse; width: 100%; font-size: 13px; }
@@ -893,7 +892,18 @@
   function toggleList() {
     const hidden = document.body.classList.toggle('list-hidden');
     $('list-toggle').innerHTML = hidden ? '&#9650; Show list' : '&#9660; Hide list';
-    map.invalidateSize();
+    const mapEl = $('map');
+    if (hidden) {
+      const divH   = document.querySelector('.list-divider').offsetHeight;
+      const shellH = document.querySelector('.shell').offsetHeight
+                     || (window.innerHeight - 50);
+      mapEl.style.height = Math.max(shellH - divH, 200) + 'px';
+    } else {
+      mapEl.style.height = '';
+    }
+    // Force a synchronous reflow so Leaflet measures the updated container
+    void mapEl.offsetHeight;
+    mainMap.invalidateSize();
   }
 
   /* ── Keyboard shortcuts ──────────────────────────────────── */
