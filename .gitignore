@@ -12,3 +12,6 @@ output/
 
 # OS
 .DS_Store
+
+# Local editor / preview state
+.claude/
