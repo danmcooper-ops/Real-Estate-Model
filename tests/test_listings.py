@@ -3,6 +3,7 @@
 
 from scripts.fetch_listings import categorize, normalize_listing
 from scripts.listings_app import filter_listings
+from scripts.estimate import add_estimates
 
 
 # --- RentCast -> normalized mapping & category bucketing ---
@@ -95,3 +96,45 @@ def test_filter_categories():
 def test_filter_combined():
     out = filter_listings(SAMPLE, price_max=600000, zip='10001', categories={'condo'})
     assert [L['id'] for L in out] == ['1']
+
+
+# --- add_estimates (comparable $/sqft value estimate) ---
+
+def _residential(zip_, price, sqft, id_='x'):
+    return {'id': id_, 'state': 'VT', 'zip': zip_, 'category': 'residential',
+            'price': price, 'squareFootage': sqft}
+
+
+def test_estimate_uses_zip_category_median_ppsf():
+    # Five comps in 05401 residential at exactly $200/sqft -> median ppsf 200.
+    listings = [_residential('05401', 200 * sf, sf, str(i))
+                for i, sf in enumerate([1000, 1200, 1500, 1800, 2000])]
+    # A target home with 1000 sqft should estimate to 200 * 1000 = 200,000.
+    target = _residential('05401', 999_999, 1000, 'target')
+    listings.append(target)
+    add_estimates(listings, min_comps=5)
+    assert target['estimate'] == 200_000
+    assert target['estimate_ppsf'] == 200
+
+
+def test_estimate_none_without_sqft():
+    listings = [_residential('05401', 300000, 1500, str(i)) for i in range(6)]
+    land = {'id': 'land', 'state': 'VT', 'zip': '05401', 'category': 'land',
+            'price': 90000, 'squareFootage': None}
+    listings.append(land)
+    add_estimates(listings, min_comps=5)
+    assert land['estimate'] is None
+    assert land['estimate_ppsf'] is None
+
+
+def test_estimate_falls_back_to_broader_group():
+    # Only 2 comps in the ZIP (below min_comps) but enough statewide -> uses
+    # the state median rather than leaving the estimate empty.
+    listings = [_residential('05401', 200 * sf, sf, f'a{i}')
+                for i, sf in enumerate([1000, 1200])]
+    listings += [_residential('05602', 200 * sf, sf, f'b{i}')
+                 for i, sf in enumerate([1000, 1100, 1300, 1400])]
+    target = _residential('05401', 500000, 1000, 'target')
+    listings.append(target)
+    add_estimates(listings, min_comps=5)
+    assert target['estimate'] == 200_000  # state median ppsf 200 * 1000 sqft

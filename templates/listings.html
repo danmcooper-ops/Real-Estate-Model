@@ -112,6 +112,14 @@
       { key: 'city',          label: 'City',     num: false },
       { key: 'zip',           label: 'ZIP',      num: false },
       { key: 'price',         label: 'Price',    num: true,  fmt: v => v == null ? '' : '$' + v.toLocaleString() },
+      { key: 'estimate',      label: 'Est. Value', num: true, render: L => {
+          if (L.estimate == null) return '<span style="color:#aaa">—</span>';
+          const est = '$' + L.estimate.toLocaleString();
+          if (L.price == null) return est;
+          const pct = ((L.price - L.estimate) / L.estimate * 100).toFixed(0);
+          const color = L.price <= L.estimate ? '#137333' : '#c0392b';
+          return `<span style="color:${color}" title="List price ${pct >= 0 ? '+' : ''}${pct}% vs estimate">${est}</span>`;
+        } },
       { key: 'bedrooms',      label: 'Beds',     num: true },
       { key: 'bathrooms',     label: 'Baths',    num: true },
       { key: 'squareFootage', label: 'Sq Ft',    num: true,  fmt: v => v == null ? '' : v.toLocaleString() },
@@ -245,7 +253,7 @@
           const td = document.createElement('td');
           if (col.num) td.className = 'num';
           const raw = L[col.key];
-          let html = col.fmt ? col.fmt(raw) : (raw ?? '');
+          let html = col.render ? col.render(L) : (col.fmt ? col.fmt(raw) : (raw ?? ''));
           if (col.key === 'address' && L.url) {
             html = `<a href="${L.url}" target="_blank" rel="noopener">${raw ?? ''}</a>`;
           }

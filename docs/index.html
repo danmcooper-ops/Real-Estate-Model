@@ -340,11 +340,13 @@
       /* Shorter map on phone */
       #map { height: 30vh; min-height: 160px; }
 
-      /* Table: hide lowest-priority columns on phone */
+      /* Table: hide lowest-priority columns on phone.
+         Column order: 1 Address, 2 City, 3 ZIP, 4 Price, 5 Est. Value,
+         6 Beds, 7 Baths, 8 Sq Ft, 9 Type, 10 DOM, 11 Built. */
       table th:nth-child(3),  table td:nth-child(3),  /* ZIP   */
-      table th:nth-child(8),  table td:nth-child(8),  /* Type  */
-      table th:nth-child(9),  table td:nth-child(9),  /* DOM   */
-      table th:nth-child(10), table td:nth-child(10)  /* Built */
+      table th:nth-child(9),  table td:nth-child(9),  /* Type  */
+      table th:nth-child(10), table td:nth-child(10), /* DOM   */
+      table th:nth-child(11), table td:nth-child(11)  /* Built */
       { display: none; }
 
       /* Bigger tap rows */
@@ -502,6 +504,8 @@
     { key:'city',          label:'City',     num:false },
     { key:'zip',           label:'ZIP',      num:false },
     { key:'price',         label:'Price',    num:true,  fmt: v => v==null?'':'$'+v.toLocaleString() },
+    { key:'estimate',      label:'Est. Value', num:true, render: estimateCell,
+      title:'Rough estimate = median $/sqft of comparable local listings × this home’s sqft. A guide, not an appraisal.' },
     { key:'bedrooms',      label:'Beds',     num:true },
     { key:'bathrooms',     label:'Baths',    num:true },
     { key:'squareFootage', label:'Sq Ft',    num:true,  fmt: v => v==null?'':v.toLocaleString() },
@@ -512,7 +516,7 @@
 
   const XLSX_COLS = [
     ['Address','address'],['City','city'],['State','state'],['ZIP','zip'],
-    ['County','county'],['Price','price'],['Beds','bedrooms'],['Baths','bathrooms'],
+    ['County','county'],['Price','price'],['Est. Value','estimate'],['Beds','bedrooms'],['Baths','bathrooms'],
     ['Sq Ft','squareFootage'],['Lot Size','lotSize'],['Year Built','yearBuilt'],
     ['Type','propertyType'],['Category','category'],['DOM','daysOnMarket'],
     ['Listed','listedDate'],['MLS','mlsName'],['MLS #','mlsNumber'],
@@ -549,6 +553,20 @@
   function fmtLot(sf) {
     if (!sf) return null;
     return sf >= 43560 ? (sf/43560).toFixed(2)+' ac' : sf.toLocaleString()+' sf';
+  }
+
+  /* Value estimate cell: comp-based $/sqft estimate, colored vs. the list price.
+     Green when the home is listed at/below its estimate (potential value),
+     red when listed above. Tooltip shows the % difference. */
+  function estimateCell(L) {
+    if (L.estimate==null) return '<span style="color:#b0b6c0">—</span>';
+    const est = '$'+L.estimate.toLocaleString();
+    if (L.price==null) return est;
+    const diff = (L.price - L.estimate) / L.estimate;
+    const pct = (diff>=0?'+':'') + (diff*100).toFixed(0) + '%';
+    const color = L.price <= L.estimate ? '#137333' : '#c0392b';
+    const tip = `List price is ${pct} vs. estimate`;
+    return `<span style="color:${color}" title="${tip}">${est}</span>`;
   }
 
   /* ── Main Leaflet map ───────────────────────────────────── */
@@ -641,6 +659,7 @@
       const th=document.createElement('th');
       const arrow=sortKey===col.key?(sortAsc?' ▲':' ▼'):'';
       th.innerHTML=esc(col.label)+`<span class="arrow">${arrow}</span>`;
+      if(col.title) th.title=col.title;
       th.onclick=()=>{
         if(sortKey===col.key)sortAsc=!sortAsc;
         else{sortKey=col.key;sortAsc=true;}
@@ -673,6 +692,8 @@
         if(col.key==='address'){
           td.className='addr-cell';
           td.textContent=raw??'';
+        } else if(col.render){
+          td.innerHTML=col.render(L);
         } else {
           td.innerHTML=col.fmt?col.fmt(raw):esc(raw??'');
         }
@@ -804,6 +825,7 @@
       {v:L.bathrooms??'—',  l:'Bathrooms'},
       {v:L.squareFootage!=null?L.squareFootage.toLocaleString():'—', l:'Sq Ft'},
       {v:ppsf!=null?'$'+ppsf.toLocaleString():'—', l:'Per Sq Ft'},
+      {v:L.estimate!=null?'$'+L.estimate.toLocaleString():'—', l:'Est. Value'},
       {v:fmtLot(L.lotSize)??'—', l:'Lot Size'},
       {v:L.yearBuilt??'—',  l:'Year Built'},
     ];

@@ -25,6 +25,7 @@ from flask import Flask, jsonify, request, render_template, send_file
 
 from scripts.config import OUTPUT_DIR
 from scripts.report_listings_excel import build_listings_excel
+from scripts.estimate import add_estimates
 from scripts.fetch_listings import UI_CATEGORIES
 
 DEFAULT_CACHE = os.path.join(OUTPUT_DIR, 'listings_cache.json')
@@ -48,6 +49,7 @@ def load_cache(path=DEFAULT_CACHE):
     with open(path) as f:
         data = json.load(f)
     _LISTINGS = data.get('listings', [])
+    add_estimates(_LISTINGS)  # ensure value estimates are present (idempotent)
     _META = {'fetched_at': data.get('fetched_at'), 'states': data.get('states')}
     return _LISTINGS
 

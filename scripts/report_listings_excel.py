@@ -13,6 +13,7 @@ _COLUMNS = [
     ('State',         'state',         '@',             7),
     ('ZIP',           'zip',           '@',             8),
     ('Price',         'price',         '"$"#,##0',     14),
+    ('Est. Value',    'estimate',      '"$"#,##0',     14),
     ('Beds',          'bedrooms',      '0',             7),
     ('Baths',         'bathrooms',     '0.0',           7),
     ('Sq Ft',         'squareFootage', '#,##0',        10),

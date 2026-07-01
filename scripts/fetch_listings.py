@@ -36,6 +36,7 @@ if os.path.exists(_env_path):
                 os.environ.setdefault(_k.strip(), _v.strip())
 
 from data.rentcast_client import RentCastClient
+from scripts.estimate import add_estimates
 from scripts.config import OUTPUT_DIR
 
 DEFAULT_STATES = ['NY', 'VT']
@@ -160,6 +161,9 @@ def main():
             print("Activate an API plan (the free tier still counts) at "
                   "https://app.rentcast.io/app/api, then re-run.", file=sys.stderr)
         sys.exit(1)
+
+    # Add a comparable-$/sqft value estimate to each listing (needs the full set).
+    add_estimates(listings)
 
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
     envelope = {

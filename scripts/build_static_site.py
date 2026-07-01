@@ -20,6 +20,7 @@ import json
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+from scripts.estimate import add_estimates
 from scripts.config import OUTPUT_DIR, PROJECT_ROOT
 
 CACHE = os.path.join(OUTPUT_DIR, 'listings_cache.json')
@@ -34,6 +35,10 @@ def main():
 
     with open(CACHE) as f:
         data = json.load(f)
+
+    # Ensure each listing carries a value estimate (recompute in case the cache
+    # predates this feature; idempotent).
+    add_estimates(data.get('listings', []))
 
     os.makedirs(DOCS_DIR, exist_ok=True)
     out = os.path.join(DOCS_DIR, 'listings.json')
