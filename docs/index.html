@@ -107,6 +107,27 @@
     td.num { text-align: right; font-variant-numeric: tabular-nums; }
     td.addr-cell { font-weight: 600; color: #1b3557; max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
     .badge { display: inline-block; padding: 2px 7px; border-radius: 10px; font-size: 11px; font-weight: 500; background: #e6edf8; color: #1b3557; }
+
+    /* ── Watchlist ────────────────────────────────────────── */
+    .star { cursor: pointer; font-size: 16px; line-height: 1; color: #c9ced8; user-select: none; transition: color .1s, transform .1s; }
+    .star:hover { transform: scale(1.2); }
+    .star.on { color: #f5a623; }
+    td.watch-cell { text-align: center; padding-left: 6px; padding-right: 6px; width: 34px; }
+    th.watch-th { text-align: center; color: #f5a623; cursor: default; }
+    th.watch-th:hover { background: #f0f3f9; }
+    .btn-watch {
+      width: 100%; margin-top: 6px; background: #fff; color: #4a5568;
+      border: 1px solid #d0d5df; text-align: left;
+    }
+    .btn-watch:hover { background: #fbfcfe; border-color: #b9c0cc; }
+    .btn-watch.active { background: #fff7e6; border-color: #f5a623; color: #8a5a00; font-weight: 600; }
+    .mhdr-star {
+      background: rgba(255,255,255,.15); color: #fff; border: none; border-radius: 7px;
+      width: 36px; height: 36px; font-size: 19px; cursor: pointer; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .mhdr-star:hover { background: rgba(255,255,255,.27); }
+    .mhdr-star.on { color: #f5c542; }
     .empty { padding: 40px; text-align: center; color: #999; font-size: 14px; }
     #loading { padding: 40px; text-align: center; color: #888; font-size: 14px; }
 
@@ -341,12 +362,12 @@
       #map { height: 30vh; min-height: 160px; }
 
       /* Table: hide lowest-priority columns on phone.
-         Column order: 1 Address, 2 City, 3 ZIP, 4 Price, 5 Est. Value,
-         6 Beds, 7 Baths, 8 Sq Ft, 9 Type, 10 DOM, 11 Built. */
-      table th:nth-child(3),  table td:nth-child(3),  /* ZIP   */
-      table th:nth-child(9),  table td:nth-child(9),  /* Type  */
-      table th:nth-child(10), table td:nth-child(10), /* DOM   */
-      table th:nth-child(11), table td:nth-child(11)  /* Built */
+         Column order: 1 ★, 2 Address, 3 City, 4 ZIP, 5 Price, 6 Est. Value,
+         7 Beds, 8 Baths, 9 Sq Ft, 10 Type, 11 DOM, 12 Built. */
+      table th:nth-child(4),  table td:nth-child(4),  /* ZIP   */
+      table th:nth-child(10), table td:nth-child(10), /* Type  */
+      table th:nth-child(11), table td:nth-child(11), /* DOM   */
+      table th:nth-child(12), table td:nth-child(12)  /* Built */
       { display: none; }
 
       /* Bigger tap rows */
@@ -407,6 +428,7 @@
       </div>
       <div class="mhdr-count" id="mcount"></div>
       <button class="mhdr-nav" id="mnext" title="Next (→)">&#8594;</button>
+      <button class="mhdr-star" id="mwatch" title="Save to watchlist">&#9734;</button>
       <button class="mhdr-close" id="mclose" title="Close (Esc)">&#10005;</button>
     </div>
     <div class="mbody">
@@ -463,6 +485,9 @@
       <div class="fs-title">Type</div>
       <div class="checks" id="categories"></div>
 
+      <div class="fs-title">Watchlist</div>
+      <button class="btn-watch" id="watch-toggle">&#9734; Watchlist (0)</button>
+
       <div class="btns">
         <button class="btn-primary" id="apply">Apply</button>
         <button class="btn-reset" id="reset">Reset</button>
@@ -500,6 +525,7 @@
   const UI_CATEGORIES = ['residential','condo','apartment','land','commercial'];
 
   const COLUMNS = [
+    { key:'watch',         label:'★',        num:false },
     { key:'address',       label:'Address',  num:false },
     { key:'city',          label:'City',     num:false },
     { key:'zip',           label:'ZIP',      num:false },
@@ -530,6 +556,12 @@
   let sortKey = 'price', sortAsc = false;
   let modalIdx = -1;
   let miniMap = null, miniMarker = null;
+
+  /* Watchlist: a set of listing ids persisted in localStorage. Keyed on the
+     stable RentCast id so flags carry over when listings.json is refreshed. */
+  const WATCH_KEY = 're_watchlist_v1';
+  let watch = new Set();
+  let watchOnly = false;
 
   /* ── Helpers ───────────────────────────────────────────── */
 
@@ -567,6 +599,42 @@
     const color = L.price <= L.estimate ? '#137333' : '#c0392b';
     const tip = `List price is ${pct} vs. estimate`;
     return `<span style="color:${color}" title="${tip}">${est}</span>`;
+  }
+
+  /* ── Watchlist ─────────────────────────────────────────── */
+
+  function loadWatch() {
+    try { watch = new Set(JSON.parse(localStorage.getItem(WATCH_KEY) || '[]')); }
+    catch (e) { watch = new Set(); }
+  }
+  function saveWatch() {
+    try { localStorage.setItem(WATCH_KEY, JSON.stringify([...watch])); }
+    catch (e) { /* storage unavailable (e.g. private mode) — flags last for the session */ }
+  }
+  function starHTML(id) {
+    const on = watch.has(id);
+    return `<span class="star${on?' on':''}" title="${on?'Remove from watchlist':'Add to watchlist'}">${on?'★':'☆'}</span>`;
+  }
+  function updateWatchButton() {
+    const n = ALL.reduce((a, l) => a + (watch.has(l.id) ? 1 : 0), 0);
+    const btn = $('watch-toggle');
+    btn.innerHTML = `${watchOnly ? '★' : '☆'} Watchlist (${n})`;
+    btn.classList.toggle('active', watchOnly);
+  }
+  function updateModalStar() {
+    const L = sorted[modalIdx]; if (!L) return;
+    const on = watch.has(L.id);
+    const b = $('mwatch');
+    b.innerHTML = on ? '★' : '☆';
+    b.classList.toggle('on', on);
+    b.title = on ? 'Remove from watchlist' : 'Save to watchlist';
+  }
+  function toggleWatch(id) {
+    if (!id) return;
+    if (watch.has(id)) watch.delete(id); else watch.add(id);
+    saveWatch();
+    updateWatchButton();
+    if (watchOnly) applyFilters();   // membership changed — refresh the filtered view
   }
 
   /* ── Main Leaflet map ───────────────────────────────────── */
@@ -624,6 +692,7 @@
     const cats=selectedCats();
     const catSet = cats.length<UI_CATEGORIES.length ? new Set(cats) : null;
     return ALL.filter(L => {
+      if (watchOnly&&!watch.has(L.id)) return false;
       if (pMin!=null&&(L.price==null||L.price<pMin)) return false;
       if (pMax!=null&&(L.price==null||L.price>pMax)) return false;
       if (zip&&String(L.zip)!==zip) return false;
@@ -647,6 +716,7 @@
   function resetFilters() {
     ['price_min','price_max','fzip','fcity','fcounty','beds_min','baths_min','dom_max'].forEach(id=>$(id).value='');
     UI_CATEGORIES.forEach(c=>{const el=$('cat_'+c);if(el)el.checked=true;});
+    watchOnly=false; updateWatchButton();
     applyFilters();
   }
 
@@ -657,6 +727,10 @@
     tr.innerHTML='';
     COLUMNS.forEach(col=>{
       const th=document.createElement('th');
+      if(col.key==='watch'){
+        th.className='watch-th'; th.textContent='★'; th.title='Watchlist';
+        tr.appendChild(th); return;
+      }
       const arrow=sortKey===col.key?(sortAsc?' ▲':' ▼'):'';
       th.innerHTML=esc(col.label)+`<span class="arrow">${arrow}</span>`;
       if(col.title) th.title=col.title;
@@ -687,6 +761,13 @@
       tr.onclick=()=>openModal(i);
       COLUMNS.forEach(col=>{
         const td=document.createElement('td');
+        if(col.key==='watch'){
+          td.className='watch-cell';
+          td.innerHTML=starHTML(L.id);
+          td.onclick=(e)=>{ e.stopPropagation(); toggleWatch(L.id); if(!watchOnly) td.innerHTML=starHTML(L.id); };
+          tr.appendChild(td);
+          return;
+        }
         if(col.num)td.className='num';
         const raw=L[col.key];
         if(col.key==='address'){
@@ -773,6 +854,9 @@
 
     /* Mini Leaflet map */
     updateMiniMap(lat, lng, L.address);
+
+    /* Watchlist star */
+    updateModalStar();
 
     /* Details panel */
     $('mdetails').innerHTML=buildDetails(L);
@@ -958,6 +1042,7 @@
     catch(e){ $('loading').textContent='Failed to load listings.json'; return; }
 
     ALL=data.listings||[];
+    loadWatch();
     $('header-meta').textContent=
       `${ALL.length.toLocaleString()} listings`+
       (data.states?.length?` · ${data.states.join(', ')}`:'') +
@@ -976,6 +1061,18 @@
     $('mprev').onclick=()=>navigateModal(-1);
     $('mnext').onclick=()=>navigateModal(1);
     $('mclose').onclick=closeModal;
+
+    /* Watchlist wiring */
+    updateWatchButton();
+    $('watch-toggle').onclick=()=>{ watchOnly=!watchOnly; updateWatchButton(); applyFilters(); };
+    $('mwatch').onclick=()=>{
+      const L=sorted[modalIdx]; if(!L) return;
+      toggleWatch(L.id);
+      updateModalStar();
+      // keep the table row's star in sync when it's still on screen
+      const row=$('tbody').children[modalIdx];
+      if(row){ const s=row.querySelector('.watch-cell'); if(s) s.innerHTML=starHTML(L.id); }
+    };
 
     window.addEventListener('resize',()=>mainMap.invalidateSize());
     applyFilters();
