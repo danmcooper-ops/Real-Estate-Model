@@ -42,6 +42,33 @@
     .field input:focus, .field select:focus { outline: none; border-color: #1b3557; box-shadow: 0 0 0 3px rgba(27,53,87,.12); background: #fff; }
     .row2 { display: flex; gap: 6px; }
     .row2 > * { flex: 1; min-width: 0; }
+
+    /* ── Multi-select (ZIP / City / County) ────────────────── */
+    .ms { position: relative; }
+    .ms-btn {
+      width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 6px;
+      padding: 6px 8px; border: 1px solid #d0d5df; border-radius: 6px;
+      background: #f8f9fb; font-size: 13px; color: #1a1a1a; cursor: pointer; text-align: left;
+    }
+    .ms-btn:hover { border-color: #b9c0cc; }
+    .ms.open .ms-btn { border-color: #1b3557; box-shadow: 0 0 0 3px rgba(27,53,87,.12); background: #fff; }
+    .ms-txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ms-caret { color: #8892a4; font-size: 10px; flex-shrink: 0; }
+    .ms-panel {
+      margin-top: 4px; border: 1px solid #d0d5df; border-radius: 6px; background: #fff;
+      box-shadow: 0 4px 14px rgba(0,0,0,.10); padding: 6px;
+    }
+    .ms-search { width: 100%; padding: 5px 7px; border: 1px solid #d0d5df; border-radius: 5px; font-size: 12px; margin-bottom: 5px; }
+    .ms-actions { font-size: 11px; margin-bottom: 5px; }
+    .ms-actions a { color: #1b3557; text-decoration: none; font-weight: 600; cursor: pointer; }
+    .ms-actions a:hover { text-decoration: underline; }
+    .ms-actions .sep { color: #c0c6d0; margin: 0 5px; }
+    .ms-list { max-height: 168px; overflow-y: auto; display: flex; flex-direction: column; gap: 1px; }
+    .ms-row { display: flex; align-items: center; gap: 6px; font-size: 12px; padding: 3px 4px; cursor: pointer; border-radius: 4px; }
+    .ms-row:hover { background: #f0f3f9; }
+    .ms-row input { width: 13px; height: 13px; accent-color: #1b3557; flex-shrink: 0; }
+    .ms-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ms-empty { font-size: 12px; color: #8892a4; padding: 6px 4px; }
     .checks { display: flex; flex-direction: column; gap: 2px; }
     .checks label { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 400; color: #1a1a1a; padding: 3px 0; cursor: pointer; text-transform: none; letter-spacing: 0; }
     .checks input[type=checkbox] { width: 14px; height: 14px; accent-color: #1b3557; cursor: pointer; }
@@ -463,16 +490,16 @@
 
       <div class="fs-title">Location</div>
       <div class="field">
-        <label for="fzip">ZIP Code</label>
-        <select id="fzip"><option value="">All ZIPs</option></select>
+        <label>ZIP Code</label>
+        <div class="ms" id="ms-zip"></div>
       </div>
       <div class="field">
-        <label for="fcity">City / Town</label>
-        <select id="fcity"><option value="">All Cities</option></select>
+        <label>City / Town</label>
+        <div class="ms" id="ms-city"></div>
       </div>
       <div class="field">
-        <label for="fcounty">County</label>
-        <select id="fcounty"><option value="">All Counties</option></select>
+        <label>County</label>
+        <div class="ms" id="ms-county"></div>
       </div>
 
       <div class="fs-title">Property</div>
@@ -680,22 +707,84 @@
     });
   }
 
-  function buildSelect(id, vals) {
-    const sel = $(id);
-    vals.forEach(v => {
-      const o = document.createElement('option');
-      o.value = v; o.textContent = v;
-      sel.appendChild(o);
+  /* Multi-select dropdown: pick any combination of options (all / all-but-one /
+     one / subset). Empty selection means "no filter" (i.e. all). Instances are
+     stored in `multiSelects` and read by filterListings(). */
+  const multiSelects = {};
+
+  function makeMultiSelect(mountEl, label, options) {
+    const selected = new Set();
+    const btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'ms-btn';
+    const panel = document.createElement('div');
+    panel.className = 'ms-panel'; panel.hidden = true;
+    const search = document.createElement('input');
+    search.className = 'ms-search'; search.type = 'text';
+    search.placeholder = `Search ${label.toLowerCase()}…`;
+    const actions = document.createElement('div');
+    actions.className = 'ms-actions';
+    const allA = document.createElement('a'); allA.textContent = 'Select all';
+    const clrA = document.createElement('a'); clrA.textContent = 'Clear';
+    actions.append(allA, Object.assign(document.createElement('span'), {className:'sep', textContent:'·'}), clrA);
+    const list = document.createElement('div'); list.className = 'ms-list';
+
+    const rows = options.map(opt => {
+      const row = document.createElement('label'); row.className = 'ms-row';
+      const cb = document.createElement('input'); cb.type = 'checkbox';
+      const span = document.createElement('span'); span.textContent = opt;
+      row.append(cb, span);
+      cb.addEventListener('change', () => { cb.checked ? selected.add(opt) : selected.delete(opt); updateSummary(); });
+      list.appendChild(row);
+      return { opt, row, cb };
     });
+
+    function updateSummary() {
+      const n = selected.size;
+      const text = (n === 0 || n === options.length) ? `All ${label}`
+                 : (n === 1 ? [...selected][0] : `${n} ${label}`);
+      btn.innerHTML = `<span class="ms-txt">${esc(text)}</span><span class="ms-caret">▾</span>`;
+    }
+    function setAll(on) {
+      selected.clear();
+      rows.forEach(r => { r.cb.checked = on; if (on) selected.add(r.opt); });
+      updateSummary();
+    }
+    allA.onclick = (e) => { e.preventDefault(); setAll(true); };
+    clrA.onclick = (e) => { e.preventDefault(); setAll(false); };
+    search.addEventListener('input', () => {
+      const q = search.value.toLowerCase();
+      rows.forEach(r => { r.row.style.display = r.opt.toLowerCase().includes(q) ? '' : 'none'; });
+    });
+    btn.onclick = () => {
+      const open = panel.hidden;
+      panel.hidden = !open;
+      mountEl.classList.toggle('open', open);
+      if (open) search.focus();
+    };
+
+    panel.append(search, actions, list);
+    mountEl.append(btn, panel);
+    updateSummary();
+
+    return {
+      selected,
+      reset() { setAll(false); },
+      close() { panel.hidden = true; mountEl.classList.remove('open'); },
+      contains(el) { return mountEl.contains(el); },
+    };
   }
 
   function buildSelects() {
-    const zips    = [...new Set(ALL.map(l=>l.zip).filter(Boolean).map(String))].sort();
-    const cities  = [...new Set(ALL.map(l=>l.city).filter(Boolean))].sort();
-    const counties= [...new Set(ALL.map(l=>l.county).filter(Boolean))].sort();
-    buildSelect('fzip',    zips);
-    buildSelect('fcity',   cities);
-    buildSelect('fcounty', counties);
+    const zips     = [...new Set(ALL.map(l=>l.zip).filter(Boolean).map(String))].sort();
+    const cities   = [...new Set(ALL.map(l=>l.city).filter(Boolean))].sort();
+    const counties = [...new Set(ALL.map(l=>l.county).filter(Boolean))].sort();
+    multiSelects.zip    = makeMultiSelect($('ms-zip'),    'ZIPs',     zips);
+    multiSelects.city   = makeMultiSelect($('ms-city'),   'Cities',   cities);
+    multiSelects.county = makeMultiSelect($('ms-county'), 'Counties', counties);
+    // Close any open dropdown when clicking elsewhere.
+    document.addEventListener('click', (e) => {
+      Object.values(multiSelects).forEach(ms => { if (!ms.contains(e.target)) ms.close(); });
+    });
   }
 
   function selectedCats() {
@@ -705,16 +794,16 @@
   function filterListings() {
     const pMin=num('price_min'), pMax=num('price_max');
     const bMin=num('beds_min'),  baMin=num('baths_min'), domMax=num('dom_max');
-    const zip=$('fzip').value||null, city=$('fcity').value||null, county=$('fcounty').value||null;
+    const zipSel=multiSelects.zip.selected, citySel=multiSelects.city.selected, countySel=multiSelects.county.selected;
     const cats=selectedCats();
     const catSet = cats.length<UI_CATEGORIES.length ? new Set(cats) : null;
     return ALL.filter(L => {
       if (watchOnly&&!watch.has(L.id)) return false;
       if (pMin!=null&&(L.price==null||L.price<pMin)) return false;
       if (pMax!=null&&(L.price==null||L.price>pMax)) return false;
-      if (zip&&String(L.zip)!==zip) return false;
-      if (city&&L.city!==city) return false;
-      if (county&&L.county!==county) return false;
+      if (zipSel.size&&!zipSel.has(String(L.zip))) return false;
+      if (citySel.size&&!citySel.has(L.city)) return false;
+      if (countySel.size&&!countySel.has(L.county)) return false;
       if (bMin!=null&&(L.bedrooms==null||L.bedrooms<bMin)) return false;
       if (baMin!=null&&(L.bathrooms==null||L.bathrooms<baMin)) return false;
       if (domMax!=null&&(L.daysOnMarket==null||L.daysOnMarket>domMax)) return false;
@@ -736,7 +825,8 @@
   }
 
   function resetFilters() {
-    ['price_min','price_max','fzip','fcity','fcounty','beds_min','baths_min','dom_max'].forEach(id=>$(id).value='');
+    ['price_min','price_max','beds_min','baths_min','dom_max'].forEach(id=>$(id).value='');
+    ['zip','city','county'].forEach(k=>multiSelects[k]&&multiSelects[k].reset());
     UI_CATEGORIES.forEach(c=>{const el=$('cat_'+c);if(el)el.checked=true;});
     watchOnly=false; updateWatchButton();
     applyFilters();
