@@ -63,10 +63,16 @@
 
     /* ── List toggle divider ──────────────────────────────── */
     .list-divider {
-      display: flex; align-items: center; justify-content: center;
-      height: 22px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: space-between;
+      height: 24px; flex-shrink: 0; padding: 0 10px;
       background: #e8ebf0; border-top: 1px solid #d0d5df; border-bottom: 1px solid #d0d5df;
     }
+    .sync-label {
+      display: flex; align-items: center; gap: 5px;
+      font-size: 11px; font-weight: 600; color: #4a5568; cursor: pointer; user-select: none;
+    }
+    .sync-label input { width: 13px; height: 13px; accent-color: #1b3557; cursor: pointer; }
+    body.list-hidden .sync-label { display: none; }
     #list-toggle {
       background: #fff; border: 1px solid #c8cdd8; border-radius: 10px;
       padding: 1px 12px; font-size: 11px; font-weight: 600; color: #4a5568;
@@ -500,6 +506,9 @@
     <main>
       <div id="map"></div>
       <div class="list-divider">
+        <label class="sync-label" title="Show only listings inside the current map view">
+          <input type="checkbox" id="map-sync" checked> Sync list to map
+        </label>
         <button id="list-toggle" onclick="toggleList()">&#9660; Hide list</button>
       </div>
       <div class="table-wrap">
@@ -562,6 +571,10 @@
   const WATCH_KEY = 're_watchlist_v1';
   let watch = new Set();
   let watchOnly = false;
+
+  /* When true, the table shows only listings within the current map viewport,
+     updating as you zoom/pan. Map markers always show the full filtered set. */
+  let mapSync = true;
 
   /* ── Helpers ───────────────────────────────────────────── */
 
@@ -646,6 +659,10 @@
   const cluster = L.markerClusterGroup();
   mainMap.addLayer(cluster);
 
+  /* Re-render the table (only) when the map is zoomed/panned, so the list
+     reflects what's in view. Never moves the map, so there's no feedback loop. */
+  mainMap.on('moveend', () => { if (mapSync) renderTable(); });
+
   /* ── Filter sidebar ─────────────────────────────────────── */
 
   function buildCategoryChecks() {
@@ -708,9 +725,14 @@
 
   function applyFilters() {
     listings = filterListings();
-    $('count').textContent = listings.length.toLocaleString()+' of '+ALL.length.toLocaleString()+' listings';
-    renderTable();
-    renderMainMap();
+    renderTable();      // sets `sorted` (full filtered set) and the count
+    renderMainMap();    // markers for the full set; fitBounds -> moveend -> renderTable
+  }
+
+  function updateCount(shown) {
+    $('count').textContent = (mapSync && mainMap)
+      ? `${shown.toLocaleString()} in map view · ${listings.length.toLocaleString()} match filters`
+      : `${listings.length.toLocaleString()} of ${ALL.length.toLocaleString()} listings`;
   }
 
   function resetFilters() {
@@ -753,9 +775,15 @@
     });
     const tbody=$('tbody');
     tbody.innerHTML='';
-    $('empty').style.display=sorted.length?'none':'block';
+    // When synced to the map, show only rows whose marker is in the current
+    // viewport. `sorted` stays the full filtered set so markers/modal are intact;
+    // we just skip out-of-view rows (keeping each row's index into `sorted`).
+    const bounds=(mapSync&&mainMap)?mainMap.getBounds():null;
     const frag=document.createDocumentFragment();
+    let shown=0;
     sorted.forEach((L,i)=>{
+      if(bounds&&(L.lat==null||L.lng==null||!bounds.contains([L.lat,L.lng]))) return;
+      shown++;
       const tr=document.createElement('tr');
       tr.title='Click to view details';
       tr.onclick=()=>openModal(i);
@@ -783,6 +811,12 @@
       frag.appendChild(tr);
     });
     tbody.appendChild(frag);
+    const emptyEl=$('empty');
+    emptyEl.style.display=shown?'none':'block';
+    if(!shown) emptyEl.textContent=(bounds&&listings.length)
+      ? 'No listings in this map view — zoom out or pan to see more.'
+      : 'No listings match these filters.';
+    updateCount(shown);
   }
 
   /* ── Main map markers ───────────────────────────────────── */
@@ -1061,6 +1095,9 @@
     $('mprev').onclick=()=>navigateModal(-1);
     $('mnext').onclick=()=>navigateModal(1);
     $('mclose').onclick=closeModal;
+
+    /* Map-sync wiring */
+    $('map-sync').onchange = (e) => { mapSync = e.target.checked; renderTable(); };
 
     /* Watchlist wiring */
     updateWatchButton();
