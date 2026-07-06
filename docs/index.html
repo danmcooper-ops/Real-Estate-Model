@@ -234,6 +234,17 @@
       border-right: 1px solid #e2e6ef;
     }
     #modal-mini-map { flex: 1; min-height: 0; }
+    #mphoto-wrap { position: relative; height: 190px; flex-shrink: 0; background: #cdd6e4; overflow: hidden; }
+    #mphoto { width: 100%; height: 100%; object-fit: cover; display: block; }
+    #mphoto-wrap .photo-tag {
+      position: absolute; left: 8px; bottom: 8px; z-index: 2;
+      background: rgba(0,0,0,.6); color: #fff; font-size: 10px; font-weight: 600;
+      padding: 2px 7px; border-radius: 10px; letter-spacing: .03em;
+    }
+    #mphoto-wrap .photo-load {
+      position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+      color: #6b7688; font-size: 12px;
+    }
     .map-links {
       padding: 8px 12px; display: flex; gap: 8px; flex-wrap: wrap;
       background: #f4f6fa; border-top: 1px solid #dde1ea;
@@ -466,6 +477,7 @@
     </div>
     <div class="mbody">
       <div class="mpanel-map">
+        <div id="mphoto-wrap" hidden><img id="mphoto" alt=""><span class="photo-tag" id="mphoto-tag"></span></div>
         <div id="modal-mini-map"></div>
         <div class="map-links">
           <a class="map-link" id="ml-gmaps" href="#" target="_blank" rel="noopener">&#128205; Google Maps</a>
@@ -592,6 +604,10 @@
   let sortKey = 'price', sortAsc = false;
   let modalIdx = -1;
   let miniMap = null, miniMarker = null;
+
+  /* Google Maps key (injected into listings.json at build time). Empty => photos
+     are hidden. photoToken guards against stale responses during fast nav. */
+  let MAPS_KEY = '', photoToken = 0;
 
   /* Watchlist: a set of listing ids persisted in localStorage. Keyed on the
      stable RentCast id so flags carry over when listings.json is refreshed. */
@@ -976,6 +992,9 @@
       $('ml-sat').href=`https://www.google.com/maps/search/?api=1&query=${addrQ}`;
     }
 
+    /* Property photo (Street View / satellite) */
+    updateModalPhoto(L);
+
     /* Mini Leaflet map */
     updateMiniMap(lat, lng, L.address);
 
@@ -984,6 +1003,22 @@
 
     /* Details panel */
     $('mdetails').innerHTML=buildDetails(L);
+  }
+
+  /* Load an on-demand property photo: Google Street View, falling back to a
+     satellite image where there's no street coverage. Hidden if no key/coords. */
+  function updateModalPhoto(L) {
+    const wrap=$('mphoto-wrap'), img=$('mphoto'), tag=$('mphoto-tag');
+    if(!MAPS_KEY || L.lat==null || L.lng==null){ wrap.hidden=true; img.removeAttribute('src'); return; }
+    const loc=`${L.lat},${L.lng}`;
+    const sv=`https://maps.googleapis.com/maps/api/streetview?size=640x360&location=${loc}&fov=80&key=${MAPS_KEY}`;
+    const sat=`https://maps.googleapis.com/maps/api/staticmap?center=${loc}&zoom=18&size=640x360&maptype=satellite&markers=color:0xc0392b%7C${loc}&key=${MAPS_KEY}`;
+    const token=++photoToken;   // ignore stale responses when navigating quickly
+    wrap.hidden=false; img.removeAttribute('src'); tag.textContent='Loading…'; img.alt=L.address||'';
+    fetch(`https://maps.googleapis.com/maps/api/streetview/metadata?location=${loc}&key=${MAPS_KEY}`)
+      .then(r=>r.json())
+      .then(m=>{ if(token!==photoToken) return; const street=m.status==='OK'; img.src=street?sv:sat; tag.textContent=street?'Street View':'Satellite'; })
+      .catch(()=>{ if(token!==photoToken) return; img.src=sat; tag.textContent='Satellite'; });
   }
 
   /* Initialize/update the mini Leaflet map in the modal */
@@ -1166,6 +1201,8 @@
     catch(e){ $('loading').textContent='Failed to load listings.json'; return; }
 
     ALL=data.listings||[];
+    MAPS_KEY=data.mapsKey||'';
+    $('mphoto').onerror=()=>{ $('mphoto-wrap').hidden=true; };  // hide on load failure (e.g. bad key)
     loadWatch();
     $('header-meta').textContent=
       `${ALL.length.toLocaleString()} listings`+

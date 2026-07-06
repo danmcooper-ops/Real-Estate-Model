@@ -20,6 +20,17 @@ import json
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+# Load .env from project root (simple key=value parser) so GOOGLE_MAPS_API_KEY
+# is available to inject into the published data.
+_env_path = os.path.join(os.path.dirname(__file__), '..', '.env')
+if os.path.exists(_env_path):
+    with open(_env_path) as _f:
+        for _line in _f:
+            _line = _line.strip()
+            if _line and not _line.startswith('#') and '=' in _line:
+                _k, _v = _line.split('=', 1)
+                os.environ.setdefault(_k.strip(), _v.strip())
+
 from scripts.estimate import add_estimates
 from scripts.config import OUTPUT_DIR, PROJECT_ROOT
 
@@ -39,6 +50,10 @@ def main():
     # Ensure each listing carries a value estimate (recompute in case the cache
     # predates this feature; idempotent).
     add_estimates(data.get('listings', []))
+
+    # Inject the Google Maps key (for on-demand Street View / satellite photos).
+    # Referrer-restricted key, so it's safe to ship in the public site.
+    data['mapsKey'] = os.environ.get('GOOGLE_MAPS_API_KEY', '')
 
     os.makedirs(DOCS_DIR, exist_ok=True)
     out = os.path.join(DOCS_DIR, 'listings.json')
