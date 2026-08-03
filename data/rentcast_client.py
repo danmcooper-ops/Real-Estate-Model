@@ -50,6 +50,10 @@ class RentCastClient:
         # Set by _get on auth/billing/plan errors so callers (e.g. the fetch
         # CLI) can surface an actionable message instead of "0 listings".
         self.last_error = None
+        # Billable requests made by this client. RentCast bills per successful
+        # (HTTP 200) request regardless of how many records come back, so this
+        # mirrors what the account is charged — cache hits cost nothing.
+        self.request_count = 0
 
     @property
     def available(self):
@@ -82,7 +86,9 @@ class RentCastClient:
         })
         try:
             with urlopen(req, timeout=20, context=_SSL_CONTEXT) as resp:
-                return json.loads(resp.read().decode())
+                body = json.loads(resp.read().decode())
+                self.request_count += 1  # 200 => billable
+                return body
         except HTTPError as e:
             if e.code in (401, 402, 403):
                 # Bad key, inactive subscription, or plan limit — record why so

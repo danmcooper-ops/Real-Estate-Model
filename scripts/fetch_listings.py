@@ -38,9 +38,11 @@ if os.path.exists(_env_path):
 from data.rentcast_client import RentCastClient
 from scripts.estimate import add_estimates
 from scripts.config import OUTPUT_DIR
+from scripts import quota
 
 DEFAULT_STATES = ['NY', 'VT']
 DEFAULT_CACHE = os.path.join(OUTPUT_DIR, 'listings_cache.json')
+USAGE_FILE = os.path.join(OUTPUT_DIR, 'api_usage.json')
 
 # RentCast propertyType -> UI filter bucket. RentCast never emits a commercial
 # type, so 'commercial' is absent here by design (kept selectable in the UI for
@@ -144,6 +146,12 @@ def main():
                         help='Cap records per state/ZIP query (protects API quota)')
     parser.add_argument('--out', default=DEFAULT_CACHE,
                         help=f'Output cache path (default: {DEFAULT_CACHE})')
+    parser.add_argument('--quota-budget', type=int, default=quota.DEFAULT_BUDGET,
+                        help=f'Monthly RentCast request budget '
+                             f'(default: {quota.DEFAULT_BUDGET} of the free plan\'s '
+                             f'{quota.FREE_PLAN_LIMIT})')
+    parser.add_argument('--ignore-quota', action='store_true',
+                        help='Fetch even if the monthly budget is spent (may incur overage fees)')
     args = parser.parse_args()
 
     client = RentCastClient()
@@ -151,9 +159,27 @@ def main():
         print('ERROR: RENTCAST_API_KEY not set (add it to .env).', file=sys.stderr)
         sys.exit(1)
 
+    # Don't start a refresh we can't finish inside the free plan's allowance —
+    # a half-fetched cache would publish a truncated site *and* cost money.
+    month = quota.current_month()
+    usage = quota.load_usage(USAGE_FILE, month)
+    ok, msg = quota.check_budget(usage, budget=args.quota_budget)
+    print(msg)
+    if not ok and not args.ignore_quota:
+        print('SKIPPED: no fetch performed (use --ignore-quota to override).')
+        sys.exit(0)
+
     print(f"Fetching states={args.states} zips={args.zips} max_records={args.max_records}")
-    listings = fetch_all(client, args.states, zips=args.zips,
-                         max_records=args.max_records)
+    try:
+        listings = fetch_all(client, args.states, zips=args.zips,
+                             max_records=args.max_records)
+    finally:
+        # Record spend even if the fetch blows up partway — those requests were
+        # still billed, and forgetting them is how a budget quietly overruns.
+        if client.request_count:
+            spent = quota.record_usage(USAGE_FILE, month, client.request_count)
+            print(f"API requests this run: {client.request_count} "
+                  f"({spent['requests']}/{args.quota_budget} used in {month})")
 
     if not listings and client.last_error:
         print(f"\nERROR: RentCast request failed — {client.last_error}", file=sys.stderr)
